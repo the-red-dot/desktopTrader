@@ -1,42 +1,455 @@
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;700;800&display=swap');
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-html,
+/* --- Reset & Base --- */
+* { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-  max-width: 100vw;
-  overflow-x: hidden;
+    font-family: 'Heebo', sans-serif;
+    overflow: hidden; 
+    user-select: none;
+    height: 100vh;
+    width: 100vw;
+    color: white;
+    background: #1a1a2e; /* Fallback */
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* --- Scrollbar Styling --- */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+
+/* --- Utility Classes --- */
+.hidden { display: none !important; }
+
+/* --- Background Animation (Upgraded - Fluid Motion) --- */
+.wallpaper-bg {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(125deg, #2c3e50, #000000, #2980b9, #8e44ad, #1a1a2e);
+    background-size: 400% 400%;
+    animation: gradient-flow 30s ease infinite;
+    z-index: -1;
 }
 
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
+.wallpaper-bg::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: radial-gradient(circle at 50% 50%, rgba(76, 209, 55, 0.1), transparent 70%),
+                radial-gradient(circle at 80% 20%, rgba(155, 89, 182, 0.1), transparent 60%);
+    mix-blend-mode: screen;
+    animation: pulse 12s ease-in-out infinite alternate;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+/* אנימציה רנדומלית ונעימה יותר */
+@keyframes gradient-flow {
+    0% { background-position: 0% 50%; }
+    25% { background-position: 50% 100%; }
+    50% { background-position: 100% 50%; }
+    75% { background-position: 50% 0%; }
+    100% { background-position: 0% 50%; }
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
+@keyframes pulse {
+    0% { opacity: 0.4; transform: scale(1); }
+    100% { opacity: 0.8; transform: scale(1.05); }
+}
+
+/* --- Layout --- */
+.main-container {
+    position: absolute;
+    right: 40px; 
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    gap: 24px;
+    height: 85vh;
+    align-items: stretch;
+    direction: rtl; /* Ensure RTL layout for the container */
+}
+
+/* --- Glassmorphism Components --- */
+.glass-panel {
+    background: rgba(16, 18, 27, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+    border-radius: 24px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* --- Ticker Column (Right) --- */
+.ticker-col {
+    width: 260px;
+    gap: 16px;
+    overflow-y: auto;
+}
+
+.coin-card {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 16px;
+    border-radius: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.2s, border-color 0.2s; 
+    border-right: 4px solid transparent;
+}
+.coin-card:hover { 
+    background: rgba(255, 255, 255, 0.12); 
+}
+
+.coin-info h3 { font-size: 1.1rem; font-weight: 700; margin: 0; }
+.coin-info span { font-size: 0.8rem; opacity: 0.7; }
+.coin-price { text-align: left; }
+.price-val { font-size: 1rem; font-weight: bold; font-family: monospace; letter-spacing: 1px; }
+
+.up { color: #00ff88; }
+.down { color: #ff4d4d; }
+.border-up { border-right-color: #00ff88; }
+.border-down { border-right-color: #ff4d4d; }
+
+/* --- Main Content Column (Left) --- */
+.calc-col {
+    width: 550px;
+    position: relative;
+}
+
+/* --- Tabs --- */
+.tabs-container {
+    display: flex;
+    background: rgba(0,0,0,0.3);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 20px;
+    gap: 5px;
+    overflow-x: auto;
+}
+.tab-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.6);
+    padding: 10px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.2s, color 0.2s;
+    font-family: inherit;
+    flex: 1;
+    white-space: nowrap;
+    font-size: 0.9rem;
+}
+.tab-btn:hover { color: white; background: rgba(255,255,255,0.08); }
+.tab-btn.active {
+    background: #00b894;
+    color: white;
+    box-shadow: 0 4px 10px rgba(0, 184, 148, 0.3);
+}
+
+/* --- Content Areas --- */
+.tab-content {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 5px;
+    height: 100%;
+}
+
+/* --- Shortcuts Styling --- */
+.shortcuts-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+.shortcut-card {
+    background: rgba(255,255,255,0.05);
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: background 0.2s; 
+    border: 1px solid rgba(255,255,255,0.05);
+}
+.shortcut-card:hover {
+    background: rgba(255,255,255,0.1);
+}
+.key-combo {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    direction: ltr;
+}
+.key {
+    background: linear-gradient(180deg, #4b4b4b, #2a2a2a);
+    border: 1px solid #111;
+    border-bottom: 3px solid #111;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-family: monospace;
+    font-weight: bold;
+    font-size: 0.9rem;
+    color: #eee;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+.shortcut-desc {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    text-align: right;
+    padding-right: 15px;
+}
+
+/* --- Inputs --- */
+.input-group { margin-bottom: 12px; }
+.input-group label { display: block; font-size: 0.85rem; margin-bottom: 6px; opacity: 0.8; text-align: right; }
+.glass-input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 12px;
+    border-radius: 12px;
+    color: white;
+    font-size: 1.1rem;
+    outline: none;
+    font-family: monospace;
+    text-align: left;
+    direction: ltr;
+    transition: border-color 0.2s, background 0.2s;
+}
+.glass-input:focus { border-color: #00b894; background: rgba(255, 255, 255, 0.12); }
+
+select.glass-input {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat;
+    background-position: left 12px top 50%;
+    background-size: 12px auto;
+}
+option { background: #1a1a2e; color: white; }
+
+/* --- Calculator UI --- */
+.calc-header { text-align: center; margin-bottom: 25px; }
+.calc-header h2 { font-size: 2.2rem; margin-bottom: 5px; font-weight: 800; text-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+.calc-header p { opacity: 0.7; font-size: 1rem; letter-spacing: 0.5px; }
+
+.coin-select-row {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 25px;
+}
+.coin-btn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 8px 20px;
+    border-radius: 25px;
+    color: white;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+.coin-btn:hover { background: rgba(255,255,255,0.2); }
+.coin-btn.active { background: rgba(0, 184, 148, 0.2); border-color: #00b894; color: #00b894; box-shadow: 0 0 15px rgba(0,184,148,0.1); }
+
+.mode-toggle {
+    display: flex;
+    background: #0b0e14;
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 25px;
+}
+.mode-btn {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    background: transparent;
+    color: #888;
+    font-weight: 800;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: 0.2s;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.mode-btn.long.active { background: #00b894; color: white; box-shadow: 0 2px 10px rgba(0,184,148,0.2); }
+.mode-btn.short.active { background: #ff7675; color: white; box-shadow: 0 2px 10px rgba(255,118,117,0.2); }
+
+.calc-result-box {
+    background: #0b0e14;
+    border-radius: 16px;
+    padding: 25px;
+    margin-top: 25px;
+    border: 1px solid rgba(255,255,255,0.05);
+}
+.res-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px dashed rgba(255,255,255,0.2); }
+.res-main-val { color: #f1c40f; font-size: 2.2rem; font-weight: 800; font-family: monospace; line-height: 1; margin-bottom: 5px; }
+.res-sub-val { font-size: 1.1rem; font-weight: 600; opacity: 0.9; font-family: monospace; letter-spacing: 1px; }
+.res-label { font-size: 0.85rem; opacity: 0.6; margin-bottom: 4px; display: block; }
+
+.res-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.res-item-small .val { font-size: 1.3rem; font-weight: 700; font-family: monospace; }
+
+/* --- Strategy Card Styling --- */
+.strategy-card {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 20px;
+    position: relative;
+    direction: rtl;
+}
+.strategy-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+}
+.badge { padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+.badge-long { background: rgba(0, 184, 148, 0.2); color: #00b894; }
+.badge-short { background: rgba(255, 118, 117, 0.2); color: #ff7675; }
+
+.data-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.95rem; }
+.val-profit { color: #00b894; font-weight: bold; }
+.val-loss { color: #ff7675; font-weight: bold; }
+
+.sub-card {
+    background: rgba(255,255,255,0.05);
+    border-radius: 10px;
+    padding: 12px;
+    margin-top: 12px;
+    border-right: 3px solid #ff7675;
+}
+
+.total-pnl-box {
+    margin-top: 15px;
+    padding-top: 12px;
+    border-top: 1px dashed rgba(255,255,255,0.3);
+    text-align: center;
+}
+.big-pnl { font-size: 1.6rem; font-weight: 800; text-shadow: 0 0 15px rgba(0,0,0,0.5); font-family: monospace; }
+
+.btn-action {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.95rem;
+    transition: background 0.2s, transform 0.1s;
+}
+.btn-add-spot { background: #6c5ce7; color: white; }
+.btn-add-spot:hover { background: #5649c0; }
+.btn-add-short { background: rgba(255, 118, 117, 0.15); color: #ff7675; border: 1px solid rgba(255, 118, 117, 0.5); }
+.btn-add-short:hover { background: rgba(255, 118, 117, 0.25); }
+
+/* כפתורי עריכה ומחיקה */
+.icon-btn { 
+    background: transparent; 
+    border: none; 
+    font-size: 1.1rem; 
+    cursor: pointer; 
+    padding: 0 6px; 
+    opacity: 0.7; 
+    transition: 0.2s; 
+}
+.icon-btn:hover { opacity: 1; transform: scale(1.1); }
+.btn-delete { color: #ff7675; }
+.btn-delete:hover { color: #ff4d4d; }
+.btn-edit { color: #74b9ff; }
+.btn-edit:hover { color: #0984e3; }
+
+.projection-box {
+    font-size: 0.85rem;
+    background: rgba(0,0,0,0.4);
+    padding: 10px;
+    border-radius: 8px;
+    margin-top: 10px;
+}
+
+/* --- Lock Screen Styles --- */
+.lock-container {
+    text-align: center;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+.lock-icon { font-size: 3rem; margin-bottom: 20px; color: #ff7675; }
+.lock-input { 
+    text-align: center; 
+    letter-spacing: 5px; 
+    font-size: 1.5rem; 
+    width: 200px;
+}
+
+/* --- Modal Styling --- */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.6);
+    z-index: 100;
+    backdrop-filter: blur(5px);
+}
+
+.modal-content {
+    background: #151922;
+    border: 1px solid rgba(255,255,255,0.15);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+    position: fixed;
+    top: 50%;
+    left: 35%; /* הוזז שמאלה במקום 50% */
+    transform: translate(-50%, -50%);
+    z-index: 200;
+    width: 360px;
+    /* display is handled by React conditional rendering */
+}
+
+/* Confim Modal Center */
+.modal-content.confirm-modal {
+    left: 50%;
+    width: 300px;
+    text-align: center;
+}
+
+.investment-highlight {
+    background: rgba(108, 92, 231, 0.1);
+    border: 1px solid rgba(108, 92, 231, 0.3);
+    padding: 10px;
+    border-radius: 8px;
+    margin-top: 10px;
+    text-align: center;
+}
+.investment-val {
+    color: #a29bfe;
+    font-weight: 800;
+    font-size: 1.2rem;
+    font-family: monospace;
+}
+.profit-highlight {
+     background: rgba(0, 184, 148, 0.1);
+     border: 1px solid rgba(0, 184, 148, 0.3);
+     padding: 10px;
+     border-radius: 8px;
+     margin-top: 10px;
+     text-align: center;
+}
+.profit-val {
+     color: #55efc4;
+     font-weight: 800;
+     font-size: 1.2rem;
+     font-family: monospace;
 }

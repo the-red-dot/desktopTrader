@@ -1,0 +1,7 @@
+1. Stage and Commit
+This captures all your current work.
+
+Bash
+git add .
+git commit -m "first commit"
+git push -u origin main

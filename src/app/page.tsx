@@ -17,6 +17,8 @@ interface Position {
     sl: number;
     risk: number;
     currency: string;
+    trade_date?: string; // New field
+    trade_time?: string; // New field
     shorts: Position[];
 }
 
@@ -58,7 +60,9 @@ export default function TradeWall() {
             tp: '',
             sl: '',
             risk: '',
-            currency: 'USDT'
+            currency: 'USDT',
+            date: '', // New input state
+            time: ''  // New input state
         }
     });
 
@@ -136,6 +140,8 @@ export default function TradeWall() {
                         sl: Number(spot.sl),
                         risk: Number(spot.risk),
                         currency: spot.currency,
+                        trade_date: spot.trade_date,
+                        trade_time: spot.trade_time,
                         shorts: [] 
                     });
                 }
@@ -155,6 +161,8 @@ export default function TradeWall() {
                             sl: Number(short.sl),
                             risk: Number(short.risk),
                             currency: short.currency,
+                            trade_date: short.trade_date,
+                            trade_time: short.trade_time,
                             shorts: []
                         });
                     }
@@ -225,24 +233,49 @@ export default function TradeWall() {
     const { calcInvest: modalInvest, calcProfit: modalProfit } = calculateModalValues();
 
     const openModal = (mode: 'add' | 'edit', coin: string, parentIdx: number | null = null, childIdx: number | null = null) => {
-        let initialData = { entry: prices[coin]?.toString() || '', amount: '', tp: '', sl: '', risk: '', currency: 'USDT' };
+        const now = new Date();
+        // Format date as YYYY-MM-DD for input type="date"
+        const defaultDate = now.toISOString().split('T')[0];
+        // Format time as HH:MM for input type="time"
+        const defaultTime = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+        let initialData = { 
+            entry: prices[coin]?.toString() || '', 
+            amount: '', 
+            tp: '', 
+            sl: '', 
+            risk: '', 
+            currency: 'USDT',
+            date: defaultDate,
+            time: defaultTime
+        };
 
         if (mode === 'edit') {
             if (parentIdx !== null && childIdx === null) {
                 // Edit Spot
                 const p = portfolio[coin][parentIdx];
                 initialData = { 
-                    entry: p.entry.toString(), amount: p.amount.toString(), 
-                    tp: p.tp?.toString() || '', sl: p.sl?.toString() || '', 
-                    risk: p.risk?.toString() || '', currency: p.currency || 'USDT' 
+                    entry: p.entry.toString(), 
+                    amount: p.amount.toString(), 
+                    tp: p.tp?.toString() || '', 
+                    sl: p.sl?.toString() || '', 
+                    risk: p.risk?.toString() || '', 
+                    currency: p.currency || 'USDT',
+                    date: p.trade_date || defaultDate,
+                    time: p.trade_time || defaultTime
                 };
             } else if (parentIdx !== null && childIdx !== null) {
                 // Edit Short
                 const s = portfolio[coin][parentIdx].shorts[childIdx];
                 initialData = { 
-                    entry: s.entry.toString(), amount: s.amount.toString(), 
-                    tp: s.tp?.toString() || '', sl: s.sl?.toString() || '', 
-                    risk: s.risk?.toString() || '', currency: s.currency || 'USDT' 
+                    entry: s.entry.toString(), 
+                    amount: s.amount.toString(), 
+                    tp: s.tp?.toString() || '', 
+                    sl: s.sl?.toString() || '', 
+                    risk: s.risk?.toString() || '', 
+                    currency: s.currency || 'USDT',
+                    date: s.trade_date || defaultDate,
+                    time: s.trade_time || defaultTime
                 };
             }
         }
@@ -274,7 +307,9 @@ export default function TradeWall() {
             tp: parseFloat(data.tp) || 0,
             sl: parseFloat(data.sl) || 0,
             risk: parseFloat(data.risk) || 0,
-            currency: data.currency
+            currency: data.currency,
+            trade_date: data.date,
+            trade_time: data.time
         };
 
         try {
@@ -408,7 +443,10 @@ export default function TradeWall() {
                         <div key={idx} className="strategy-card">
                             {/* Spot Header */}
                             <div className="strategy-header">
-                                <span className="badge badge-long" style={{fontSize:'0.9rem'}}>SPOT LONG ({spot.currency || 'USDT'})</span>
+                                <div style={{display:'flex', flexDirection:'column'}}>
+                                    <span className="badge badge-long" style={{fontSize:'0.9rem'}}>SPOT LONG ({spot.currency || 'USDT'})</span>
+                                    {spot.trade_date && <span style={{fontSize:'0.75rem', opacity:0.6, marginTop:4}}>{spot.trade_date} {spot.trade_time}</span>}
+                                </div>
                                 <div>
                                     <button className="icon-btn btn-edit" onClick={() => openModal('edit', activeTab, idx)}>✎</button>
                                     <button className="icon-btn btn-delete" onClick={() => setDeleteModal({isOpen:true, type:'spot', coin: activeTab, index: idx, shortIndex: null})}>🗑</button>
@@ -437,7 +475,10 @@ export default function TradeWall() {
                                 return (
                                     <div key={sIdx} className="sub-card">
                                         <div className="strategy-header" style={{marginBottom:8, border:'none', padding:0}}>
-                                            <span className="badge badge-short">Short {sIdx + 1} ({short.currency || 'USDT'})</span>
+                                            <div style={{display:'flex', flexDirection:'column'}}>
+                                                <span className="badge badge-short">Short {sIdx + 1} ({short.currency || 'USDT'})</span>
+                                                {short.trade_date && <span style={{fontSize:'0.7rem', opacity:0.6}}>{short.trade_date} {short.trade_time}</span>}
+                                            </div>
                                             <div>
                                                 <button className="icon-btn btn-edit" onClick={() => openModal('edit', activeTab, idx, sIdx)}>✎</button>
                                                 <button className="icon-btn btn-delete" onClick={() => setDeleteModal({isOpen:true, type:'short', coin: activeTab, index: idx, shortIndex: sIdx})}>×</button>
@@ -547,6 +588,17 @@ export default function TradeWall() {
                                 <option value="USDT">USDT</option>
                                 <option value="USDC">USDC</option>
                             </select>
+                        </div>
+
+                        <div style={{display:'flex', gap:10, marginBottom:12}}>
+                            <div className="input-group" style={{flex:1}}>
+                                <label>תאריך</label>
+                                <input type="date" className="glass-input" value={modal.data.date} onChange={e => handleModalInput('date', e.target.value)} />
+                            </div>
+                            <div className="input-group" style={{flex:1}}>
+                                <label>שעה</label>
+                                <input type="time" className="glass-input" value={modal.data.time} onChange={e => handleModalInput('time', e.target.value)} />
+                            </div>
                         </div>
 
                         <div className="input-group">

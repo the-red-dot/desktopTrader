@@ -1,7 +1,7 @@
 // tradewall\src\components\LiveTicker.tsx
 
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient'; // וודא שהנתיב תואם למיקום הקובץ בפרויקט
+import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from '../lib/supabaseClient'; 
 
 type Prices = {
     [key: string]: number;
@@ -15,9 +15,9 @@ interface LiveTickerProps {
 interface Alert {
     id: string;
     coin: string;
-    target_price: number; // שינוי שם כדי שיתאים ל-DB
+    target_price: number; 
     condition: 'above' | 'below';
-    note?: string; // שדה חדש להערה
+    note?: string; 
 }
 
 const COINS = ['BTC', 'ETH', 'BNB', 'SOL'];
@@ -30,6 +30,91 @@ const COIN_COLORS: { [key: string]: string } = {
     SOL: '#14F195'  // ירוק סולנה
 };
 
+// --- קומפוננטת בחירה מותאמת אישית (פותרת את בעיית ה-Select ב-Wallpapers) ---
+interface CustomSelectProps {
+    value: string;
+    options: { value: string; label: string }[];
+    onChange: (value: string) => void;
+}
+
+const CustomDropdown = ({ value, options, onChange }: CustomSelectProps) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // סגירת התפריט בלחיצה בחוץ
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const selectedLabel = options.find(o => o.value === value)?.label || value;
+
+    return (
+        <div ref={containerRef} style={{ position: 'relative', flex: 1 }}>
+            <div 
+                className="glass-input"
+                onClick={() => setIsOpen(!isOpen)}
+                style={{
+                    padding: '10px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    fontSize: '0.9rem',
+                    userSelect: 'none'
+                }}
+            >
+                <span>{selectedLabel}</span>
+                <span style={{ fontSize: '0.7rem', opacity: 0.7, transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', transition: '0.2s' }}>▼</span>
+            </div>
+            {isOpen && (
+                <div style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 4px)',
+                    left: 0,
+                    width: '100%',
+                    background: '#1a1a2e', // רקע כהה
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '12px',
+                    zIndex: 1000,
+                    boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
+                    overflow: 'hidden',
+                    maxHeight: '200px',
+                    overflowY: 'auto'
+                }}>
+                    {options.map((option) => (
+                        <div
+                            key={option.value}
+                            onClick={() => {
+                                onChange(option.value);
+                                setIsOpen(false);
+                            }}
+                            style={{
+                                padding: '10px 12px',
+                                cursor: 'pointer',
+                                fontSize: '0.9rem',
+                                borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                background: value === option.value ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                transition: 'background 0.2s',
+                                color: 'white'
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = value === option.value ? 'rgba(255,255,255,0.1)' : 'transparent')}
+                        >
+                            {option.label}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 export default function LiveTicker({ prices, onCoinClick }: LiveTickerProps) {
     const [activeTab, setActiveTab] = useState<'market' | 'alerts'>('market');
     
@@ -40,7 +125,7 @@ export default function LiveTicker({ prices, onCoinClick }: LiveTickerProps) {
     const [newAlertCoin, setNewAlertCoin] = useState('BTC');
     const [newAlertPrice, setNewAlertPrice] = useState('');
     const [newAlertCondition, setNewAlertCondition] = useState<'above' | 'below'>('above');
-    const [newAlertNote, setNewAlertNote] = useState(''); // שדה הערה חדש
+    const [newAlertNote, setNewAlertNote] = useState(''); 
 
     // טעינת התראות מה-DB בעת טעינת הרכיב
     useEffect(() => {
@@ -56,7 +141,6 @@ export default function LiveTicker({ prices, onCoinClick }: LiveTickerProps) {
         if (error) {
             console.error('Error fetching alerts:', error);
         } else if (data) {
-            // המרה לטיפוס שלנו
             setAlerts(data as Alert[]);
         }
     };
@@ -65,7 +149,6 @@ export default function LiveTicker({ prices, onCoinClick }: LiveTickerProps) {
     useEffect(() => {
         if (alerts.length === 0) return;
 
-        // שימוש במערך זמני כדי לאסוף מזהים למחיקה
         const triggeredAlertIds: string[] = [];
 
         alerts.forEach(alert => {
@@ -85,7 +168,6 @@ export default function LiveTicker({ prices, onCoinClick }: LiveTickerProps) {
             }
         });
 
-        // מחיקת ההתראות שהופעלו מהדאטהבייס ומהסטייט
         if (triggeredAlertIds.length > 0) {
             removeTriggeredAlerts(triggeredAlertIds);
         }
@@ -93,17 +175,13 @@ export default function LiveTicker({ prices, onCoinClick }: LiveTickerProps) {
     }, [prices, alerts]);
 
     const removeTriggeredAlerts = async (ids: string[]) => {
-        // עדכון אופטימי ב-UI
         setAlerts(prev => prev.filter(a => !ids.includes(a.id)));
-
-        // מחיקה מה-DB
         await supabase.from('alerts').delete().in('id', ids);
     };
 
     const sendNotification = async (alert: Alert, currentPrice: number) => {
         const direction = alert.condition === 'above' ? 'עלה מעל' : 'ירד מתחת ל';
         
-        // בניית ההודעה עם ההערה (אם יש)
         let message = `${alert.coin} הגיע למחיר $${currentPrice}! (יעד: ${direction} $${alert.target_price})`;
         if (alert.note && alert.note.trim() !== '') {
             message += `\nהערה: ${alert.note}`;
@@ -136,7 +214,6 @@ export default function LiveTicker({ prices, onCoinClick }: LiveTickerProps) {
             note: newAlertNote
         };
 
-        // שמירה ב-Supabase
         const { data, error } = await supabase
             .from('alerts')
             .insert([alertPayload])
@@ -146,18 +223,14 @@ export default function LiveTicker({ prices, onCoinClick }: LiveTickerProps) {
             alert('שגיאה בשמירת ההתראה');
             console.error(error);
         } else if (data) {
-            // הוספה לרשימה המקומית
             setAlerts(prev => [data[0] as Alert, ...prev]);
-            // איפוס שדות
             setNewAlertPrice('');
             setNewAlertNote('');
         }
     };
 
     const removeAlert = async (id: string) => {
-        // עדכון אופטימי
         setAlerts(prev => prev.filter(a => a.id !== id));
-        // מחיקה מה-DB
         await supabase.from('alerts').delete().eq('id', id);
     };
 
@@ -213,27 +286,22 @@ export default function LiveTicker({ prices, onCoinClick }: LiveTickerProps) {
                         <div style={{background:'rgba(255,255,255,0.05)', padding:12, borderRadius:12, marginBottom:15, border: '1px solid rgba(255,255,255,0.1)'}}>
                             <h4 style={{marginBottom:10, textAlign:'center', fontSize: '0.95rem'}}>הוסף התראה לנייד</h4>
                             
-                            <div style={{display:'flex', gap:5, marginBottom:8}}>
-                                <select 
-                                    value={newAlertCoin} 
-                                    onChange={(e) => setNewAlertCoin(e.target.value)}
-                                    className="glass-input" 
-                                    // הוספתי paddingLeft כדי שהטקסט לא יוסתר ע"י האייקון
-                                    style={{padding:5, paddingLeft: '35px', fontSize:'0.9rem', flex: 1}}
-                                >
-                                    {COINS.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
+                            <div style={{display:'flex', gap:10, marginBottom:8}}>
+                                {/* שימוש ברכיב המותאם אישית במקום select רגיל */}
+                                <CustomDropdown 
+                                    value={newAlertCoin}
+                                    options={COINS.map(c => ({ value: c, label: c }))}
+                                    onChange={(val) => setNewAlertCoin(val)}
+                                />
                                 
-                                <select 
-                                    value={newAlertCondition} 
-                                    onChange={(e) => setNewAlertCondition(e.target.value as 'above' | 'below')}
-                                    className="glass-input"
-                                    // הוספתי paddingLeft כדי שהטקסט לא יוסתר ע"י האייקון
-                                    style={{padding:5, paddingLeft: '35px', fontSize:'0.9rem', flex: 1}}
-                                >
-                                    <option value="above">מעל</option>
-                                    <option value="below">מתחת</option>
-                                </select>
+                                <CustomDropdown 
+                                    value={newAlertCondition}
+                                    options={[
+                                        { value: 'above', label: 'מעל' },
+                                        { value: 'below', label: 'מתחת' }
+                                    ]}
+                                    onChange={(val) => setNewAlertCondition(val as 'above' | 'below')}
+                                />
                             </div>
 
                             <input 
@@ -242,7 +310,7 @@ export default function LiveTicker({ prices, onCoinClick }: LiveTickerProps) {
                                 value={newAlertPrice}
                                 onChange={(e) => setNewAlertPrice(e.target.value)}
                                 className="glass-input"
-                                style={{padding:8, marginBottom:8, fontSize:'0.9rem'}}
+                                style={{padding:12, marginBottom:8, fontSize:'0.9rem'}}
                             />
 
                             {/* שדה הערה */}
@@ -252,7 +320,7 @@ export default function LiveTicker({ prices, onCoinClick }: LiveTickerProps) {
                                 value={newAlertNote}
                                 onChange={(e) => setNewAlertNote(e.target.value)}
                                 className="glass-input"
-                                style={{padding:8, marginBottom:10, fontSize:'0.9rem'}}
+                                style={{padding:12, marginBottom:10, fontSize:'0.9rem'}}
                             />
 
                             <button 
@@ -283,9 +351,9 @@ export default function LiveTicker({ prices, onCoinClick }: LiveTickerProps) {
                                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', width: '100%'}}>
                                         <div style={{fontSize:'0.85rem'}}>
                                             <span style={{fontWeight:'bold'}}>{alert.coin}</span> 
-                                            {/* הוספת צבע לתנאי מעל/מתחת לאינדיקציה נוספת */}
+                                            {/* שינוי מסימנים למילים ברורות */}
                                             <span style={{opacity: 0.9, color: alert.condition === 'above' ? '#00b894' : '#ff7675'}}>
-                                                {' '}{alert.condition === 'above' ? '>' : '<'} ${alert.target_price}
+                                                {' '}{alert.condition === 'above' ? 'מעל' : 'מתחת'} ${alert.target_price}
                                             </span>
                                         </div>
                                         <button 

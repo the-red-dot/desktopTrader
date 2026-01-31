@@ -17,8 +17,8 @@ interface Position {
     sl: number;
     risk: number;
     currency: string;
-    trade_date?: string; // New field
-    trade_time?: string; // New field
+    trade_date?: string;
+    trade_time?: string;
     shorts: Position[];
 }
 
@@ -61,8 +61,8 @@ export default function TradeWall() {
             sl: '',
             risk: '',
             currency: 'USDT',
-            date: '', // New input state
-            time: ''  // New input state
+            date: '',
+            time: ''
         }
     });
 
@@ -99,16 +99,64 @@ export default function TradeWall() {
 
         fetchPortfolio();
 
-        const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@miniTicker/ethusdt@miniTicker/bnbusdt@miniTicker/solusdt@miniTicker');
-        
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            const symbol = data.s.replace('USDT', '');
-            const price = parseFloat(data.c); 
-            setPrices(prev => ({ ...prev, [symbol]: price }));
+        // --- WebSocket Logic with Auto-Reconnect ---
+        let ws: WebSocket | null = null;
+        let reconnectTimer: NodeJS.Timeout | null = null;
+
+        const connectWebSocket = () => {
+            // אם כבר מחובר, אל תעשה כלום
+            if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+                return;
+            }
+
+            console.log('Connecting to Binance WebSocket...');
+            ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@miniTicker/ethusdt@miniTicker/bnbusdt@miniTicker/solusdt@miniTicker');
+            
+            ws.onopen = () => {
+                console.log('WebSocket Connected');
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                const symbol = data.s.replace('USDT', '');
+                const price = parseFloat(data.c); 
+                setPrices(prev => ({ ...prev, [symbol]: price }));
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket Closed. Reconnecting in 3s...');
+                // נסה להתחבר מחדש אחרי 3 שניות
+                reconnectTimer = setTimeout(connectWebSocket, 3000);
+            };
+
+            ws.onerror = (err) => {
+                console.error('WebSocket Error:', err);
+                ws?.close(); // סגירה יזומה כדי להפעיל את onclose והתחברות מחדש
+            };
         };
 
-        return () => ws.close();
+        // הפעלה ראשונית
+        connectWebSocket();
+
+        // האזנה לאירוע חזרה לכרטיסייה/התעוררות מחשב
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                console.log('Tab is visible, checking connection...');
+                // אם החיבור סגור או נסגר, נסה להתחבר מיד
+                if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+                    if (reconnectTimer) clearTimeout(reconnectTimer);
+                    connectWebSocket();
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            if (reconnectTimer) clearTimeout(reconnectTimer);
+            if (ws) ws.close();
+        };
     }, []);
 
     // --- Helpers & Supabase Logic ---
@@ -234,9 +282,7 @@ export default function TradeWall() {
 
     const openModal = (mode: 'add' | 'edit', coin: string, parentIdx: number | null = null, childIdx: number | null = null) => {
         const now = new Date();
-        // Format date as YYYY-MM-DD for input type="date"
         const defaultDate = now.toISOString().split('T')[0];
-        // Format time as HH:MM for input type="time"
         const defaultTime = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
         let initialData = { 
@@ -413,7 +459,7 @@ export default function TradeWall() {
         }
 
         return (
-            <div className="tab-content active" style={{direction: 'rtl'}}>
+            <div className="tab-content active" style={{direction: 'rtl', paddingLeft: '12px'}}>
                 <div style={{marginBottom:20, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                     <button className="icon-btn" onClick={() => updateLockState(true)} title="נעל מסך">🔒</button>
                     <button className="btn-action btn-add-spot" style={{width:'auto', padding:'8px 20px'}} onClick={() => openModal('add', activeTab)}>+ הוסף ספוט חדש</button>

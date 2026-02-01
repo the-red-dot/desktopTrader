@@ -10,6 +10,7 @@ type Prices = {
 interface LiveTickerProps {
     prices: Prices;
     onCoinClick: (coin: string) => void;
+    userId: string | null; // Added userId prop
 }
 
 interface Alert {
@@ -18,6 +19,7 @@ interface Alert {
     target_price: number; 
     condition: 'above' | 'below';
     note?: string; 
+    user_id?: string;
 }
 
 const COINS = ['BTC', 'ETH', 'BNB', 'SOL'];
@@ -115,7 +117,7 @@ const CustomDropdown = ({ value, options, onChange }: CustomSelectProps) => {
     );
 };
 
-export default function LiveTicker({ prices, onCoinClick }: LiveTickerProps) {
+export default function LiveTicker({ prices, onCoinClick, userId }: LiveTickerProps) {
     const [activeTab, setActiveTab] = useState<'market' | 'alerts'>('market');
     
     // ניהול התראות
@@ -127,16 +129,31 @@ export default function LiveTicker({ prices, onCoinClick }: LiveTickerProps) {
     const [newAlertCondition, setNewAlertCondition] = useState<'above' | 'below'>('above');
     const [newAlertNote, setNewAlertNote] = useState(''); 
 
-    // טעינת התראות מה-DB בעת טעינת הרכיב
+    // טעינת התראות מה-DB בעת טעינת הרכיב או שינוי משתמש
     useEffect(() => {
-        fetchAlerts();
-    }, []);
+        if (userId) {
+            fetchAlerts();
+        } else {
+            // אם המשתמש התנתק, נקה את ההתראות מהתצוגה
+            setAlerts([]);
+        }
+    }, [userId]);
 
     const fetchAlerts = async () => {
-        const { data, error } = await supabase
+        let query = supabase
             .from('alerts')
             .select('*')
             .order('created_at', { ascending: false });
+        
+        // סינון לפי משתמש או נתונים ללא שיוך
+        if (userId) {
+            query = query.eq('user_id', userId);
+        } else {
+            // במצב תקין עם RLS, זה כנראה לא יחזיר כלום, אבל נשאיר למקרה קצה
+            query = query.is('user_id', null);
+        }
+
+        const { data, error } = await query;
         
         if (error) {
             console.error('Error fetching alerts:', error);
@@ -203,15 +220,20 @@ export default function LiveTicker({ prices, onCoinClick }: LiveTickerProps) {
     };
 
     const addAlert = async () => {
+        if (!userId) {
+            alert("עליך להתחבר כדי להוסיף התראות");
+            return;
+        }
         if (!newAlertPrice) return;
         const price = parseFloat(newAlertPrice);
         if (isNaN(price)) return;
 
-        const alertPayload = {
+        const alertPayload: any = {
             coin: newAlertCoin,
             target_price: price,
             condition: newAlertCondition,
-            note: newAlertNote
+            note: newAlertNote,
+            user_id: userId // שיוך למשתמש
         };
 
         const { data, error } = await supabase
@@ -220,8 +242,9 @@ export default function LiveTicker({ prices, onCoinClick }: LiveTickerProps) {
             .select();
 
         if (error) {
-            alert('שגיאה בשמירת ההתראה');
-            console.error(error);
+            // הצגת הודעת שגיאה מפורטת יותר
+            alert('שגיאה בשמירת ההתראה: ' + error.message);
+            console.error('Supabase Insert Error:', JSON.stringify(error, null, 2));
         } else if (data) {
             setAlerts(prev => [data[0] as Alert, ...prev]);
             setNewAlertPrice('');

@@ -1,0 +1,597 @@
+// tradewall\src\components\PositionModal.tsx
+
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabaseClient';
+import { calculateHedgeStrategy, HedgeSetup } from '../app/utils/hedgeLogic';
+
+// --- Types (Shared) ---
+// שכפול ה-Interface כדי לא ליצור תלות בקובץ חיצוני אם לא קיים, 
+// במידה ויש קובץ types.ts עדיף לייבא משם.
+export interface Position {
+    id: string;
+    entry: number;
+    amount: number;
+    tp: number;
+    sl: number;
+    risk: number;
+    currency: string;
+    trade_date?: string;
+    trade_time?: string;
+    shorts: Position[];
+    user_id?: string;
+    strategy_hedges_count?: number;
+    strategy_risk_percent?: number;
+    symbol: string; // Added symbol to interface for easier access
+    parent_id?: string | null;
+}
+
+interface PositionModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    mode: 'add' | 'edit';
+    coin: string;
+    currentPrice: number;
+    user: any;
+    
+    // אם אנחנו עורכים או מוסיפים גידור לספוט קיים - נעביר אותו כאן
+    parentSpot: Position | null;
+    
+    // אם אנחנו עורכים גידור ספציפי - נעביר את האובייקט שלו (או האינדקס)
+    // לצורך פשטות נעביר את האובייקט והאינדקס לחישובים
+    childHedge: Position | null;
+    childHedgeIndex: number | null; // 0 for Hedge 1, 1 for Hedge 2...
+
+    onSuccess: (refreshAlerts: boolean) => void;
+}
+
+export default function PositionModal({
+    isOpen,
+    onClose,
+    mode,
+    coin,
+    currentPrice,
+    user,
+    parentSpot,
+    childHedge,
+    childHedgeIndex,
+    onSuccess
+}: PositionModalProps) {
+    
+    // --- Initial State Helpers ---
+    const getInitialDate = () => new Date().toISOString().split('T')[0];
+    const getInitialTime = () => new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+    // --- State ---
+    const [data, setData] = useState({
+        entry: '',
+        amount: '',
+        tp: '',
+        sl: '',
+        risk: '',
+        currency: 'USDT',
+        date: getInitialDate(),
+        time: getInitialTime()
+    });
+
+    const [strategy, setStrategy] = useState({
+        isActive: false,
+        hedgesCount: 2,
+        riskPercent: 0,
+        currentHedgeIndex: 1,
+        calculatedSetups: [] as HedgeSetup[]
+    });
+
+    const [createAlerts, setCreateAlerts] = useState(false);
+
+    // --- Effects ---
+    
+    // אתחול הטופס בפתיחה
+    useEffect(() => {
+        if (isOpen) {
+            initializeForm();
+        }
+    }, [isOpen, coin, mode, parentSpot, childHedge]);
+
+    const initializeForm = () => {
+        // איפוס בסיסי
+        let initialData = {
+            entry: currentPrice ? currentPrice.toString() : '',
+            amount: '',
+            tp: '',
+            sl: '',
+            risk: '',
+            currency: 'USDT',
+            date: getInitialDate(),
+            time: getInitialTime()
+        };
+
+        let strategyState = {
+            isActive: false,
+            hedgesCount: 2,
+            riskPercent: 0,
+            currentHedgeIndex: 1,
+            calculatedSetups: [] as HedgeSetup[]
+        };
+
+        setCreateAlerts(false);
+
+        // מצב הוספה
+        if (mode === 'add') {
+            if (parentSpot) {
+                // הוספת גידור (Hedge)
+                // אם לספוט יש TP, הוא הופך ל-SL של הגידור (לוגיקה נפוצה בגידורים)
+                if (parentSpot.tp) {
+                    initialData.sl = parentSpot.tp.toString();
+                }
+
+                // חישוב מספר הגידור הבא
+                const nextHedgeNum = (parentSpot.shorts?.length || 0) + 1;
+                strategyState.currentHedgeIndex = nextHedgeNum;
+
+                // בדיקה אם קיימת אסטרטגיה מוגדרת מראש בספוט
+                if (parentSpot.strategy_risk_percent && parentSpot.strategy_hedges_count) {
+                    const setups = calculateHedgeStrategy(
+                        parentSpot.entry,
+                        parentSpot.tp,
+                        parentSpot.amount,
+                        parentSpot.strategy_risk_percent,
+                        parentSpot.strategy_hedges_count
+                    );
+                    
+                    const setupToApply = setups[parentSpot.shorts?.length || 0];
+                    
+                    if (setupToApply) {
+                        initialData.entry = setupToApply.entry.toString();
+                        initialData.tp = setupToApply.tp.toString();
+                        initialData.sl = setupToApply.sl.toString();
+                        initialData.amount = setupToApply.coinAmount.toString();
+                        initialData.risk = setupToApply.riskAmount.toString();
+                        
+                        strategyState.isActive = true;
+                        strategyState.hedgesCount = parentSpot.strategy_hedges_count;
+                        strategyState.riskPercent = parentSpot.strategy_risk_percent;
+                        strategyState.calculatedSetups = setups;
+                    }
+                }
+            } else {
+                // הוספת ספוט חדש - המחיר הנוכחי כבר הוזן ב-initialData
+            }
+        } 
+        // מצב עריכה
+        else if (mode === 'edit') {
+            const source = childHedge || parentSpot;
+            if (source) {
+                initialData = {
+                    ...initialData,
+                    entry: source.entry.toString(),
+                    amount: source.amount.toString(),
+                    tp: source.tp.toString(),
+                    sl: source.sl.toString(),
+                    risk: source.risk.toString(),
+                    currency: source.currency,
+                    date: source.trade_date || getInitialDate(),
+                    time: source.trade_time || getInitialTime()
+                };
+            }
+        }
+
+        setData(initialData);
+        setStrategy(strategyState);
+    };
+
+    // --- Logic ---
+
+    const calculateValues = () => {
+        const entry = parseFloat(data.entry);
+        const amount = parseFloat(data.amount);
+        const tp = parseFloat(data.tp);
+        const sl = parseFloat(data.sl);
+
+        let calcInvest = 0;
+        let calcProfit = 0;
+        let calcRisk = 0;
+
+        // האם זה ספוט? (הוספת ספוט, או עריכת ספוט)
+        const isSpot = (mode === 'add' && !parentSpot) || (mode === 'edit' && !childHedge);
+
+        if (entry && !isNaN(entry) && amount && !isNaN(amount)) {
+            calcInvest = amount * entry;
+
+            // רווח פוטנציאלי (TP)
+            if (tp && !isNaN(tp)) {
+                if (isSpot) calcProfit = (tp - entry) * amount;
+                else calcProfit = Math.abs(entry - tp) * amount; // שורט
+            }
+
+            // סיכון פוטנציאלי (SL)
+            if (sl && !isNaN(sl)) {
+                if (isSpot) calcRisk = (entry - sl) * amount; // לונג: הפסד כשהמחיר יורד
+                else calcRisk = Math.abs(sl - entry) * amount; // שורט: הפסד כשהמחיר עולה
+            } else {
+                // אם אין סטופ, לוקחים את הריסק מהשדה הידני
+                calcRisk = parseFloat(data.risk) || 0;
+            }
+        }
+
+        return { calcInvest, calcProfit, calcRisk };
+    };
+
+    const handleInput = (field: string, value: string) => {
+        const newData = { ...data, [field]: value };
+        
+        // --- Risk Calculation Logic ---
+        // 1. If Risk changed -> Update Amount
+        if (field === 'risk') {
+             const riskVal = parseFloat(value);
+             const entryVal = parseFloat(newData.entry);
+             const slVal = parseFloat(newData.sl);
+             
+             if (!isNaN(riskVal) && !isNaN(entryVal) && !isNaN(slVal) && entryVal !== slVal) {
+                 const diff = Math.abs(entryVal - slVal);
+                 const newAmount = riskVal / diff;
+                 newData.amount = newAmount.toFixed(6);
+             }
+        }
+        // 2. If Amount/Entry/SL changed -> Update Risk
+        else if (field === 'amount' || field === 'entry' || field === 'sl') {
+            const entryVal = parseFloat(newData.entry);
+            const slVal = parseFloat(newData.sl);
+            const amountVal = parseFloat(newData.amount);
+
+            if (!isNaN(amountVal) && !isNaN(entryVal) && !isNaN(slVal)) {
+                 const diff = Math.abs(entryVal - slVal);
+                 const newRisk = diff * amountVal;
+                 newData.risk = newRisk.toFixed(2);
+            }
+        }
+        
+        // Dynamic Strategy Recalculation (if adding hedge and strategy active)
+        if (strategy.isActive && parentSpot && mode === 'add' && (field === 'entry' || field === 'sl')) {
+            const newEntry = field === 'entry' ? parseFloat(value) : parseFloat(data.entry);
+            const newSL = field === 'sl' ? parseFloat(value) : parseFloat(data.sl);
+
+            if (!isNaN(newEntry) && !isNaN(newSL)) {
+                const newSetups = calculateHedgeStrategy(
+                    parentSpot.entry,
+                    newSL,
+                    parentSpot.amount,
+                    strategy.riskPercent,
+                    strategy.hedgesCount,
+                    newEntry
+                );
+
+                const currentSetupIdx = strategy.currentHedgeIndex - 1;
+                const updatedSetup = newSetups[currentSetupIdx];
+
+                if (updatedSetup) {
+                    newData.amount = updatedSetup.coinAmount.toString();
+                    newData.risk = updatedSetup.riskAmount.toString();
+                    newData.tp = updatedSetup.tp.toString();
+                }
+
+                setStrategy(prev => ({
+                    ...prev,
+                    calculatedSetups: newSetups
+                }));
+                
+                // עדכון ה-state עם הערכים החדשים שחושבו
+                setData(newData);
+                return;
+            }
+        }
+
+        setData(newData);
+    };
+
+    const applyHedgeStrategy = (percent: number) => {
+        if (!parentSpot) return;
+        
+        const currentFormEntry = parseFloat(data.entry);
+        // אם המשתמש הזין מחיר כניסה, נשתמש בו כבסיס, אחרת נשתמש במחיר הכניסה של הספוט (או מחיר נוכחי)
+        const startPrice = !isNaN(currentFormEntry) ? currentFormEntry : parentSpot.entry;
+        
+        const currentFormSL = parseFloat(data.sl);
+        // אם המשתמש הזין סטופ, נשתמש בו, אחרת נשתמש ב-TP של הספוט (שהוא הסטופ של הגידור בד"כ)
+        const targetSL = !isNaN(currentFormSL) ? currentFormSL : parentSpot.tp;
+
+        const setups = calculateHedgeStrategy(
+            parentSpot.entry,
+            targetSL,
+            parentSpot.amount,
+            percent, 
+            strategy.hedgesCount,
+            startPrice
+        );
+
+        const nextHedgeIdx = strategy.currentHedgeIndex - 1; 
+        const setupToApply = setups[nextHedgeIdx];
+
+        if (setupToApply) {
+            setStrategy(prev => ({
+                ...prev,
+                isActive: true,
+                riskPercent: percent,
+                calculatedSetups: setups,
+            }));
+            
+            setData(prev => ({
+                ...prev,
+                entry: setupToApply.entry.toString(),
+                tp: setupToApply.tp.toString(),
+                sl: setupToApply.sl.toString(),
+                amount: setupToApply.coinAmount.toString(),
+                risk: setupToApply.riskAmount.toString(),
+            }));
+        }
+    };
+
+    const handleSave = async () => {
+        if (!user) {
+            alert("נא להתחבר");
+            return;
+        }
+
+        const entry = parseFloat(data.entry);
+        const amount = parseFloat(data.amount);
+
+        if (!entry || !amount) {
+            alert("נא למלא מחיר וכמות");
+            return;
+        }
+
+        const tpVal = parseFloat(data.tp) || 0;
+        const slVal = parseFloat(data.sl) || 0;
+
+        const dbPayload: any = {
+            symbol: coin,
+            entry: entry,
+            amount: amount,
+            tp: tpVal,
+            sl: slVal,
+            risk: parseFloat(data.risk) || 0,
+            currency: data.currency,
+            trade_date: data.date,
+            trade_time: data.time,
+            user_id: user.id
+        };
+
+        try {
+            let savedRecord: any = null;
+            let refreshAlerts = false;
+
+            if (mode === 'add') {
+                if (!parentSpot) {
+                    // יצירת ספוט חדש
+                    dbPayload.parent_id = null;
+                    const { data: inserted, error } = await supabase.from('positions').insert([dbPayload]).select();
+                    if (error) throw error;
+                    savedRecord = inserted[0];
+                } else {
+                    // יצירת גידור (Hedge)
+                    dbPayload.parent_id = parentSpot.id;
+                    
+                    // עדכון אסטרטגיה בספוט האב אם זו פעם ראשונה או שהשתנתה
+                    if (strategy.isActive && (parentSpot.shorts?.length === 0 || strategy.currentHedgeIndex === 1)) {
+                        await supabase.from('positions').update({
+                            strategy_hedges_count: strategy.hedgesCount,
+                            strategy_risk_percent: strategy.riskPercent
+                        }).eq('id', parentSpot.id);
+                    }
+
+                    const { data: inserted, error } = await supabase.from('positions').insert([dbPayload]).select();
+                    if (error) throw error;
+                    savedRecord = inserted[0];
+                }
+
+            } else {
+                // עריכה
+                let idToUpdate = '';
+                if (childHedge) {
+                    idToUpdate = childHedge.id;
+                } else if (parentSpot) {
+                    idToUpdate = parentSpot.id;
+                }
+                
+                if (idToUpdate) {
+                    const { data: updated, error } = await supabase.from('positions').update(dbPayload).eq('id', idToUpdate).select();
+                    if (error) throw error;
+                    savedRecord = updated[0];
+                }
+            }
+
+            // יצירת התראות אם המשתמש סימן
+            if (createAlerts && savedRecord) {
+                const alertsToCreate = [];
+
+                if (!parentSpot) {
+                    // התראות לספוט
+                    if (tpVal > 0) alertsToCreate.push({ coin, target_price: tpVal, condition: 'above', note: `Spot ${coin} TP Hit - Close All`, user_id: user.id });
+                    if (slVal > 0) alertsToCreate.push({ coin, target_price: slVal, condition: 'below', note: `Spot ${coin} SL Hit`, user_id: user.id });
+                } else {
+                    // התראות לגידור
+                    if (tpVal > 0) alertsToCreate.push({ 
+                        coin, target_price: tpVal, condition: 'below', 
+                        note: `Hedge ${strategy.currentHedgeIndex} (${coin}) TP`, user_id: user.id 
+                    });
+                    if (slVal > 0) alertsToCreate.push({ 
+                        coin, target_price: slVal, condition: 'above', 
+                        note: `Hedge ${strategy.currentHedgeIndex} (${coin}) SL`, user_id: user.id 
+                    });
+
+                    // התראה לכניסה לגידור הבא (אם חושב באסטרטגיה)
+                    if (strategy.calculatedSetups && strategy.calculatedSetups.length > 0) {
+                        const nextSetup = strategy.calculatedSetups.find(s => s.index === strategy.currentHedgeIndex + 1);
+                        
+                        if (nextSetup) {
+                            alertsToCreate.push({
+                                coin: coin,
+                                target_price: nextSetup.entry,
+                                condition: 'above',
+                                note: `⚠️ ENTER HEDGE ${nextSetup.index} NOW! ($${nextSetup.entry})`,
+                                user_id: user.id
+                            });
+                        }
+                    }
+                }
+
+                if (alertsToCreate.length > 0) {
+                    await supabase.from('alerts').insert(alertsToCreate);
+                    refreshAlerts = true;
+                }
+            }
+
+            onSuccess(refreshAlerts);
+            onClose();
+
+        } catch (err: any) {
+            console.error("Error saving position:", err.message);
+            alert("שגיאה בשמירה: " + err.message);
+        }
+    };
+
+    const { calcInvest, calcProfit, calcRisk } = calculateValues();
+
+    if (!isOpen) return null;
+
+    return (
+        <>
+            <div className="modal-overlay" onClick={onClose}></div>
+            <div className="glass-panel modal-content" style={{width: 420}}>
+                <h3 style={{ textAlign: 'center', marginBottom: 20 }}>
+                    {mode === 'add'
+                        ? (!parentSpot ? `הוספת ספוט ${coin}` : `הוספת גידור (Hedge ${strategy.currentHedgeIndex})`)
+                        : 'עריכת פוזיציה'
+                    }
+                </h3>
+
+                {/* בחירת אסטרטגיה - מוצג רק בהוספת גידור ראשון */}
+                {mode === 'add' && parentSpot && strategy.currentHedgeIndex === 1 && (
+                    <div style={{marginBottom: 20, padding: 10, background: 'rgba(255,255,255,0.05)', borderRadius: 10}}>
+                        <div style={{fontSize:'0.85rem', marginBottom: 8, textAlign:'center'}}>בחר אסטרטגיה (תחול על כל הגידורים):</div>
+                        <div style={{display:'flex', justifyContent:'center', gap:5, marginBottom:10}}>
+                            {[2,3,4].map(num => (
+                                <button 
+                                    key={num}
+                                    onClick={() => setStrategy(prev => ({...prev, hedgesCount: num}))}
+                                    style={{
+                                        background: strategy.hedgesCount === num ? '#00b894' : '#333',
+                                        border: 'none', borderRadius: 4, padding: '4px 10px', color: 'white', cursor:'pointer', fontSize: '0.8rem'
+                                    }}
+                                >
+                                    {num} גידורים
+                                </button>
+                            ))}
+                        </div>
+                        <div style={{display:'flex', gap: 5, justifyContent: 'center'}}>
+                            {[25, 50, 75, 100].map(pct => (
+                                <button 
+                                    key={pct}
+                                    onClick={() => applyHedgeStrategy(pct)}
+                                    className="btn-action"
+                                    style={{
+                                        background: strategy.riskPercent === pct ? '#6c5ce7' : 'rgba(255,255,255,0.1)',
+                                        fontSize: '0.8rem', padding: '6px 12px', border: '1px solid rgba(255,255,255,0.1)', width: 'auto'
+                                    }}
+                                >
+                                    {pct}% סיכון
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 10 }}>
+                     <div className="input-group" style={{ flex: 1 }}>
+                        <label>תאריך</label>
+                        <input type="date" className="glass-input" value={data.date} onChange={e => handleInput('date', e.target.value)} />
+                     </div>
+                     <div className="input-group" style={{ flex: 1 }}>
+                        <label>שעה</label>
+                        <input type="time" className="glass-input" value={data.time} onChange={e => handleInput('time', e.target.value)} />
+                     </div>
+                </div>
+
+                <div className="input-group">
+                    <label>מחיר כניסה ($)</label>
+                    <input type="number" className="glass-input" value={data.entry} onChange={e => handleInput('entry', e.target.value)} />
+                </div>
+
+                <div style={{ display: 'flex', gap: 10 }}>
+                    <div className="input-group" style={{ flex: 1 }}>
+                        <label>TP (יעד)</label>
+                        <input type="number" className="glass-input" value={data.tp} onChange={e => handleInput('tp', e.target.value)} />
+                    </div>
+                    <div className="input-group" style={{ flex: 1 }}>
+                        <label>SL (סטופ)</label>
+                        <input type="number" className="glass-input" value={data.sl} onChange={e => handleInput('sl', e.target.value)} />
+                    </div>
+                </div>
+
+                {/* תצוגת רווח/הפסד פוטנציאלי */}
+                <div style={{
+                    display:'flex', justifyContent:'space-around', alignItems:'center', 
+                    marginBottom:12, padding:10, borderRadius:8, 
+                    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)'
+                }}>
+                    <div style={{textAlign:'center'}}>
+                        <div style={{fontSize:'0.75rem', opacity:0.8, marginBottom:2}}>הפסד פוטנציאלי (Risk)</div>
+                        <div style={{color:'#ff7675', fontWeight:'bold', fontFamily:'monospace', fontSize:'1rem'}}>
+                            -${calcRisk.toLocaleString(undefined, {maximumFractionDigits:2})}
+                        </div>
+                    </div>
+                    <div style={{width:1, height:30, background:'rgba(255,255,255,0.2)'}}></div>
+                    <div style={{textAlign:'center'}}>
+                        <div style={{fontSize:'0.75rem', opacity:0.8, marginBottom:2}}>רווח פוטנציאלי (Reward)</div>
+                        <div style={{color:'#00b894', fontWeight:'bold', fontFamily:'monospace', fontSize:'1rem'}}>
+                            +${calcProfit.toLocaleString(undefined, {maximumFractionDigits:2})}
+                        </div>
+                    </div>
+                </div>
+
+                {/* טבלת השקעה/סיכון/כמות */}
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginTop:10}}>
+                     <div className="investment-highlight">
+                        <span style={{fontSize:'0.7rem', opacity:0.7}}>סכום סיכון ($)</span>
+                        <input type="number" className="glass-input" style={{textAlign:'center', fontSize:'1rem', padding:5}} value={data.risk} onChange={e => handleInput('risk', e.target.value)} />
+                     </div>
+                     <div className="investment-highlight">
+                        <span style={{fontSize:'0.7rem', opacity:0.7}}>כמות (Coins)</span>
+                        <input type="number" className="glass-input" style={{textAlign:'center', fontSize:'1rem', padding:5}} value={data.amount} onChange={e => handleInput('amount', e.target.value)} />
+                     </div>
+                     <div className="investment-highlight">
+                        <span style={{fontSize:'0.7rem', opacity:0.7}}>השקעה ($)</span>
+                        <div className="investment-val" style={{fontSize:'1rem'}}>${calcInvest.toFixed(2)}</div>
+                     </div>
+                </div>
+
+                <div style={{marginTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', padding: 8, borderRadius: 8}} onClick={() => setCreateAlerts(!createAlerts)}>
+                    <div style={{
+                        width: 20, height: 20, borderRadius: 4, 
+                        border: '2px solid #00b894', 
+                        background: createAlerts ? '#00b894' : 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                        {createAlerts && <span style={{color:'white', fontWeight:'bold', fontSize:'0.8rem'}}>✓</span>}
+                    </div>
+                    <span style={{fontSize: '0.9rem'}}>🔔 צור התראות אוטומטיות</span>
+                </div>
+                
+                {createAlerts && mode === 'add' && (
+                    <div style={{textAlign:'center', fontSize:'0.75rem', color:'#00b894', marginTop:4, opacity: 0.8}}>
+                        {!parentSpot 
+                            ? "ייווצרו התראות TP ו-SL לספוט"
+                            : `ייווצרו התראות לגידור ${strategy.currentHedgeIndex}` + (strategy.calculatedSetups.length > strategy.currentHedgeIndex ? ` + כוננות לגידור הבא` : "")
+                        }
+                    </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+                    <button onClick={handleSave} className="btn-action btn-add-spot" style={{ flex: 1 }}>
+                        {mode === 'add' ? 'שמור וצור' : 'עדכן'}
+                    </button>
+                    <button onClick={onClose} className="btn-action" style={{ flex: 1, background: '#333', color: '#ccc' }}>ביטול</button>
+                </div>
+            </div>
+        </>
+    );
+}

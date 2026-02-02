@@ -10,7 +10,8 @@ type Prices = {
 interface LiveTickerProps {
     prices: Prices;
     onCoinClick: (coin: string) => void;
-    userId: string | null; // Added userId prop
+    userId: string | null; 
+    refreshTrigger: number; // Added for refresh logic
 }
 
 interface Alert {
@@ -117,7 +118,7 @@ const CustomDropdown = ({ value, options, onChange }: CustomSelectProps) => {
     );
 };
 
-export default function LiveTicker({ prices, onCoinClick, userId }: LiveTickerProps) {
+export default function LiveTicker({ prices, onCoinClick, userId, refreshTrigger }: LiveTickerProps) {
     const [activeTab, setActiveTab] = useState<'market' | 'alerts'>('market');
     
     // ניהול התראות
@@ -137,14 +138,14 @@ export default function LiveTicker({ prices, onCoinClick, userId }: LiveTickerPr
             // אם המשתמש התנתק, נקה את ההתראות מהתצוגה
             setAlerts([]);
         }
-    }, [userId]);
+    }, [userId, refreshTrigger]); // Added refreshTrigger
 
     const fetchAlerts = async () => {
         let query = supabase
             .from('alerts')
             .select('*')
             .order('created_at', { ascending: false });
-        
+
         // סינון לפי משתמש או נתונים ללא שיוך
         if (userId) {
             query = query.eq('user_id', userId);

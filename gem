@@ -1,0 +1,2485 @@
+Folder: src
+
+    Folder: app
+        File: favicon.ico
+            [Could not read file: 'utf-8' codec can't decode byte 0x96 in position 50: invalid start byte]
+        File: globals.css
+            Code:
+            @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;700;800&display=swap');
+            
+            /* --- Reset & Base --- */
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body {
+                font-family: 'Heebo', sans-serif;
+                overflow: hidden; 
+                user-select: none;
+                height: 100vh;
+                width: 100vw;
+                color: white;
+                background: #1a1a2e; /* Fallback */
+            }
+            
+            /* --- Scrollbar Styling --- */
+            ::-webkit-scrollbar { width: 6px; }
+            ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+            ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+            ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+            
+            /* --- Utility Classes --- */
+            .hidden { display: none !important; }
+            
+            /* --- Background Animation (Upgraded - Fluid Motion) --- */
+            .wallpaper-bg {
+                position: fixed;
+                top: 0; left: 0; width: 100%; height: 100%;
+                background: linear-gradient(125deg, #2c3e50, #000000, #2980b9, #8e44ad, #1a1a2e);
+                background-size: 400% 400%;
+                animation: gradient-flow 30s ease infinite;
+                z-index: -1;
+            }
+            
+            .wallpaper-bg::after {
+                content: '';
+                position: absolute;
+                top: 0; left: 0; width: 100%; height: 100%;
+                background: radial-gradient(circle at 50% 50%, rgba(76, 209, 55, 0.1), transparent 70%),
+                            radial-gradient(circle at 80% 20%, rgba(155, 89, 182, 0.1), transparent 60%);
+                mix-blend-mode: screen;
+                animation: pulse 12s ease-in-out infinite alternate;
+            }
+            
+            /* אנימציה רנדומלית ונעימה יותר */
+            @keyframes gradient-flow {
+                0% { background-position: 0% 50%; }
+                25% { background-position: 50% 100%; }
+                50% { background-position: 100% 50%; }
+                75% { background-position: 50% 0%; }
+                100% { background-position: 0% 50%; }
+            }
+            
+            @keyframes pulse {
+                0% { opacity: 0.4; transform: scale(1); }
+                100% { opacity: 0.8; transform: scale(1.05); }
+            }
+            
+            /* --- Layout --- */
+            .main-container {
+                position: absolute;
+                right: 40px; 
+                top: 50%;
+                transform: translateY(-50%);
+                display: flex;
+                gap: 24px;
+                height: 85vh;
+                align-items: stretch;
+                direction: rtl; /* Ensure RTL layout for the container */
+            }
+            
+            /* --- Glassmorphism Components --- */
+            .glass-panel {
+                background: rgba(16, 18, 27, 0.75);
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+                border-radius: 24px;
+                padding: 24px;
+                display: flex;
+                flex-direction: column;
+            }
+            
+            /* --- Ticker Column (Right) --- */
+            .ticker-col {
+                width: 260px;
+                gap: 16px;
+                overflow-y: auto;
+            }
+            
+            .coin-card {
+                background: rgba(255, 255, 255, 0.05);
+                padding: 16px;
+                border-radius: 16px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                transition: background 0.2s, border-color 0.2s; 
+                border-right: 4px solid transparent;
+            }
+            .coin-card:hover { 
+                background: rgba(255, 255, 255, 0.12); 
+            }
+            
+            .coin-info h3 { font-size: 1.1rem; font-weight: 700; margin: 0; }
+            .coin-info span { font-size: 0.8rem; opacity: 0.7; }
+            .coin-price { text-align: left; }
+            .price-val { font-size: 1rem; font-weight: bold; font-family: monospace; letter-spacing: 1px; }
+            
+            .up { color: #00ff88; }
+            .down { color: #ff4d4d; }
+            .border-up { border-right-color: #00ff88; }
+            .border-down { border-right-color: #ff4d4d; }
+            
+            /* --- Main Content Column (Left) --- */
+            .calc-col {
+                width: 550px;
+                position: relative;
+            }
+            
+            /* --- Tabs --- */
+            .tabs-container {
+                display: flex;
+                background: rgba(0,0,0,0.3);
+                border-radius: 12px;
+                padding: 4px;
+                margin-bottom: 20px;
+                gap: 5px;
+                overflow-x: auto;
+            }
+            .tab-btn {
+                background: transparent;
+                border: none;
+                color: rgba(255,255,255,0.6);
+                padding: 10px 10px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: bold;
+                transition: background 0.2s, color 0.2s;
+                font-family: inherit;
+                flex: 1;
+                white-space: nowrap;
+                font-size: 0.9rem;
+            }
+            .tab-btn:hover { color: white; background: rgba(255,255,255,0.08); }
+            .tab-btn.active {
+                background: #00b894;
+                color: white;
+                box-shadow: 0 4px 10px rgba(0, 184, 148, 0.3);
+            }
+            
+            /* --- Content Areas --- */
+            .tab-content {
+                flex: 1;
+                overflow-y: auto;
+                padding-right: 5px;
+                height: 100%;
+            }
+            
+            /* --- Shortcuts Styling --- */
+            .shortcuts-grid {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            .shortcut-card {
+                background: rgba(255,255,255,0.05);
+                border-radius: 12px;
+                padding: 12px 16px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                transition: background 0.2s; 
+                border: 1px solid rgba(255,255,255,0.05);
+            }
+            .shortcut-card:hover {
+                background: rgba(255,255,255,0.1);
+            }
+            .key-combo {
+                display: flex;
+                gap: 6px;
+                align-items: center;
+                direction: ltr;
+            }
+            .key {
+                background: linear-gradient(180deg, #4b4b4b, #2a2a2a);
+                border: 1px solid #111;
+                border-bottom: 3px solid #111;
+                border-radius: 6px;
+                padding: 4px 10px;
+                font-family: monospace;
+                font-weight: bold;
+                font-size: 0.9rem;
+                color: #eee;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            }
+            .shortcut-desc {
+                font-size: 0.9rem;
+                opacity: 0.9;
+                text-align: right;
+                padding-right: 15px;
+            }
+            
+            /* --- Inputs --- */
+            .input-group { margin-bottom: 12px; }
+            .input-group label { display: block; font-size: 0.85rem; margin-bottom: 6px; opacity: 0.8; text-align: right; }
+            .glass-input {
+                width: 100%;
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                padding: 12px;
+                border-radius: 12px;
+                color: white;
+                font-size: 1.1rem;
+                outline: none;
+                font-family: monospace;
+                text-align: left;
+                direction: ltr;
+                transition: border-color 0.2s, background 0.2s;
+            }
+            .glass-input:focus { border-color: #00b894; background: rgba(255, 255, 255, 0.12); }
+            
+            select.glass-input {
+                appearance: none;
+                background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+                background-repeat: no-repeat;
+                background-position: left 12px top 50%;
+                background-size: 12px auto;
+            }
+            option { background: #1a1a2e; color: white; }
+            
+            /* --- Calculator UI --- */
+            .calc-header { text-align: center; margin-bottom: 25px; }
+            .calc-header h2 { font-size: 2.2rem; margin-bottom: 5px; font-weight: 800; text-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+            .calc-header p { opacity: 0.7; font-size: 1rem; letter-spacing: 0.5px; }
+            
+            .coin-select-row {
+                display: flex;
+                justify-content: center;
+                gap: 12px;
+                margin-bottom: 25px;
+            }
+            .coin-btn {
+                background: rgba(255,255,255,0.1);
+                border: 1px solid rgba(255,255,255,0.1);
+                padding: 8px 20px;
+                border-radius: 25px;
+                color: white;
+                cursor: pointer;
+                font-weight: 700;
+                font-size: 0.9rem;
+                transition: all 0.2s;
+            }
+            .coin-btn:hover { background: rgba(255,255,255,0.2); }
+            .coin-btn.active { background: rgba(0, 184, 148, 0.2); border-color: #00b894; color: #00b894; box-shadow: 0 0 15px rgba(0,184,148,0.1); }
+            
+            .mode-toggle {
+                display: flex;
+                background: #0b0e14;
+                border-radius: 12px;
+                padding: 4px;
+                margin-bottom: 25px;
+            }
+            .mode-btn {
+                flex: 1;
+                padding: 12px;
+                border: none;
+                background: transparent;
+                color: #888;
+                font-weight: 800;
+                border-radius: 10px;
+                cursor: pointer;
+                transition: 0.2s;
+                font-size: 1rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+            }
+            .mode-btn.long.active { background: #00b894; color: white; box-shadow: 0 2px 10px rgba(0,184,148,0.2); }
+            .mode-btn.short.active { background: #ff7675; color: white; box-shadow: 0 2px 10px rgba(255,118,117,0.2); }
+            
+            .calc-result-box {
+                background: #0b0e14;
+                border-radius: 16px;
+                padding: 25px;
+                margin-top: 25px;
+                border: 1px solid rgba(255,255,255,0.05);
+            }
+            .res-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px dashed rgba(255,255,255,0.2); }
+            .res-main-val { color: #f1c40f; font-size: 2.2rem; font-weight: 800; font-family: monospace; line-height: 1; margin-bottom: 5px; }
+            .res-sub-val { font-size: 1.1rem; font-weight: 600; opacity: 0.9; font-family: monospace; letter-spacing: 1px; }
+            .res-label { font-size: 0.85rem; opacity: 0.6; margin-bottom: 4px; display: block; }
+            
+            .res-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+            .res-item-small .val { font-size: 1.3rem; font-weight: 700; font-family: monospace; }
+            
+            /* --- Strategy Card Styling --- */
+            .strategy-card {
+                background: rgba(0,0,0,0.3);
+                border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 16px;
+                padding: 16px;
+                margin-bottom: 20px;
+                position: relative;
+                direction: rtl;
+            }
+            .strategy-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                border-bottom: 1px solid rgba(255,255,255,0.1);
+                padding-bottom: 10px;
+                margin-bottom: 10px;
+            }
+            .badge { padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+            .badge-long { background: rgba(0, 184, 148, 0.2); color: #00b894; }
+            .badge-short { background: rgba(255, 118, 117, 0.2); color: #ff7675; }
+            
+            .data-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.95rem; }
+            .val-profit { color: #00b894; font-weight: bold; }
+            .val-loss { color: #ff7675; font-weight: bold; }
+            
+            .sub-card {
+                background: rgba(255,255,255,0.05);
+                border-radius: 10px;
+                padding: 12px;
+                margin-top: 12px;
+                border-right: 3px solid #ff7675;
+            }
+            
+            .total-pnl-box {
+                margin-top: 15px;
+                padding-top: 12px;
+                border-top: 1px dashed rgba(255,255,255,0.3);
+                text-align: center;
+            }
+            .big-pnl { font-size: 1.6rem; font-weight: 800; text-shadow: 0 0 15px rgba(0,0,0,0.5); font-family: monospace; }
+            
+            .btn-action {
+                width: 100%;
+                padding: 10px;
+                margin-top: 10px;
+                border: none;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 700;
+                font-size: 0.95rem;
+                transition: background 0.2s, transform 0.1s;
+            }
+            .btn-add-spot { background: #6c5ce7; color: white; }
+            .btn-add-spot:hover { background: #5649c0; }
+            .btn-add-short { background: rgba(255, 118, 117, 0.15); color: #ff7675; border: 1px solid rgba(255, 118, 117, 0.5); }
+            .btn-add-short:hover { background: rgba(255, 118, 117, 0.25); }
+            
+            /* כפתורי עריכה ומחיקה */
+            .icon-btn { 
+                background: transparent; 
+                border: none; 
+                font-size: 1.1rem; 
+                cursor: pointer; 
+                padding: 0 6px; 
+                opacity: 0.7; 
+                transition: 0.2s; 
+            }
+            .icon-btn:hover { opacity: 1; transform: scale(1.1); }
+            .btn-delete { color: #ff7675; }
+            .btn-delete:hover { color: #ff4d4d; }
+            .btn-edit { color: #74b9ff; }
+            .btn-edit:hover { color: #0984e3; }
+            
+            .projection-box {
+                font-size: 0.85rem;
+                background: rgba(0,0,0,0.4);
+                padding: 10px;
+                border-radius: 8px;
+                margin-top: 10px;
+            }
+            
+            /* --- Lock Screen Styles --- */
+            .lock-container {
+                text-align: center;
+                padding: 40px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 100%;
+            }
+            .lock-icon { font-size: 3rem; margin-bottom: 20px; color: #ff7675; }
+            .lock-input { 
+                text-align: center; 
+                letter-spacing: 5px; 
+                font-size: 1.5rem; 
+                width: 200px;
+            }
+            
+            /* --- Modal Styling --- */
+            .modal-overlay {
+                position: fixed;
+                top: 0; left: 0;
+                width: 100%; height: 100%;
+                background: rgba(0,0,0,0.6);
+                z-index: 100;
+                backdrop-filter: blur(5px);
+            }
+            
+            .modal-content {
+                background: #151922;
+                border: 1px solid rgba(255,255,255,0.15);
+                box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+                position: fixed;
+                top: 50%;
+                left: 35%; /* הוזז שמאלה במקום 50% */
+                transform: translate(-50%, -50%);
+                z-index: 200;
+                width: 360px;
+                /* display is handled by React conditional rendering */
+            }
+            
+            /* Confim Modal Center */
+            .modal-content.confirm-modal {
+                left: 50%;
+                width: 300px;
+                text-align: center;
+            }
+            
+            .investment-highlight {
+                background: rgba(108, 92, 231, 0.1);
+                border: 1px solid rgba(108, 92, 231, 0.3);
+                padding: 10px;
+                border-radius: 8px;
+                margin-top: 10px;
+                text-align: center;
+            }
+            .investment-val {
+                color: #a29bfe;
+                font-weight: 800;
+                font-size: 1.2rem;
+                font-family: monospace;
+            }
+            .profit-highlight {
+                 background: rgba(0, 184, 148, 0.1);
+                 border: 1px solid rgba(0, 184, 148, 0.3);
+                 padding: 10px;
+                 border-radius: 8px;
+                 margin-top: 10px;
+                 text-align: center;
+            }
+            .profit-val {
+                 color: #55efc4;
+                 font-weight: 800;
+                 font-size: 1.2rem;
+                 font-family: monospace;
+            }
+        File: layout.tsx
+            Code:
+            import type { Metadata } from "next";
+            import { Geist, Geist_Mono } from "next/font/google";
+            import "./globals.css";
+            
+            const geistSans = Geist({
+              variable: "--font-geist-sans",
+              subsets: ["latin"],
+            });
+            
+            const geistMono = Geist_Mono({
+              variable: "--font-geist-mono",
+              subsets: ["latin"],
+            });
+            
+            export const metadata: Metadata = {
+              title: "Create Next App",
+              description: "Generated by create next app",
+            };
+            
+            export default function RootLayout({
+              children,
+            }: Readonly<{
+              children: React.ReactNode;
+            }>) {
+              return (
+                <html lang="en">
+                  <body className={`${geistSans.variable} ${geistMono.variable}`}>
+                    {children}
+                  </body>
+                </html>
+              );
+            }
+        File: page.module.css
+            Code:
+            .page {
+              --background: #fafafa;
+              --foreground: #fff;
+            
+              --text-primary: #000;
+              --text-secondary: #666;
+            
+              --button-primary-hover: #383838;
+              --button-secondary-hover: #f2f2f2;
+              --button-secondary-border: #ebebeb;
+            
+              display: flex;
+              min-height: 100vh;
+              align-items: center;
+              justify-content: center;
+              font-family: var(--font-geist-sans);
+              background-color: var(--background);
+            }
+            
+            .main {
+              display: flex;
+              min-height: 100vh;
+              width: 100%;
+              max-width: 800px;
+              flex-direction: column;
+              align-items: flex-start;
+              justify-content: space-between;
+              background-color: var(--foreground);
+              padding: 120px 60px;
+            }
+            
+            .intro {
+              display: flex;
+              flex-direction: column;
+              align-items: flex-start;
+              text-align: left;
+              gap: 24px;
+            }
+            
+            .intro h1 {
+              max-width: 320px;
+              font-size: 40px;
+              font-weight: 600;
+              line-height: 48px;
+              letter-spacing: -2.4px;
+              text-wrap: balance;
+              color: var(--text-primary);
+            }
+            
+            .intro p {
+              max-width: 440px;
+              font-size: 18px;
+              line-height: 32px;
+              text-wrap: balance;
+              color: var(--text-secondary);
+            }
+            
+            .intro a {
+              font-weight: 500;
+              color: var(--text-primary);
+            }
+            
+            .ctas {
+              display: flex;
+              flex-direction: row;
+              width: 100%;
+              max-width: 440px;
+              gap: 16px;
+              font-size: 14px;
+            }
+            
+            .ctas a {
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              height: 40px;
+              padding: 0 16px;
+              border-radius: 128px;
+              border: 1px solid transparent;
+              transition: 0.2s;
+              cursor: pointer;
+              width: fit-content;
+              font-weight: 500;
+            }
+            
+            a.primary {
+              background: var(--text-primary);
+              color: var(--background);
+              gap: 8px;
+            }
+            
+            a.secondary {
+              border-color: var(--button-secondary-border);
+            }
+            
+            /* Enable hover only on non-touch devices */
+            @media (hover: hover) and (pointer: fine) {
+              a.primary:hover {
+                background: var(--button-primary-hover);
+                border-color: transparent;
+              }
+            
+              a.secondary:hover {
+                background: var(--button-secondary-hover);
+                border-color: transparent;
+              }
+            }
+            
+            @media (max-width: 600px) {
+              .main {
+                padding: 48px 24px;
+              }
+            
+              .intro {
+                gap: 16px;
+              }
+            
+              .intro h1 {
+                font-size: 32px;
+                line-height: 40px;
+                letter-spacing: -1.92px;
+              }
+            }
+            
+            @media (prefers-color-scheme: dark) {
+              .logo {
+                filter: invert();
+              }
+            
+              .page {
+                --background: #000;
+                --foreground: #000;
+            
+                --text-primary: #ededed;
+                --text-secondary: #999;
+            
+                --button-primary-hover: #ccc;
+                --button-secondary-hover: #1a1a1a;
+                --button-secondary-border: #1a1a1a;
+              }
+            }
+        File: page.tsx
+            Code:
+            // tradewall\src\app\page.tsx
+            
+            'use client';
+            
+            import React, { useState, useEffect } from 'react';
+            import { supabase } from '../lib/supabaseClient';
+            import LiveTicker from '../components/LiveTicker';
+            import RiskCalculator from '../components/RiskCalculator';
+            import KeyboardShortcuts from '../components/KeyboardShortcuts';
+            import AuthModal from '../components/AuthModal';
+            import { calculateHedgeStrategy, HedgeSetup } from '../app/utils/hedgeLogic';
+            
+            // --- Types ---
+            interface Position {
+                id: string;
+                entry: number;
+                amount: number;
+                tp: number;
+                sl: number;
+                risk: number;
+                currency: string;
+                trade_date?: string;
+                trade_time?: string;
+                shorts: Position[];
+                user_id?: string;
+                strategy_hedges_count?: number;
+                strategy_risk_percent?: number;
+            }
+            
+            type Portfolio = {
+                [key: string]: Position[];
+            };
+            
+            type Prices = {
+                [key: string]: number;
+            };
+            
+            // --- Constants ---
+            const COINS = ['BTC', 'ETH', 'BNB', 'SOL'];
+            const SECRET_PIN = process.env.NEXT_PUBLIC_SECRET_PIN || "050488";
+            
+            export default function TradeWall() {
+                // --- State ---
+                const [prices, setPrices] = useState<Prices>({ BTC: 0, ETH: 0, BNB: 0, SOL: 0 });
+                const [activeTab, setActiveTab] = useState<string>('calc');
+            
+                // User / Auth State
+                const [user, setUser] = useState<any>(null);
+                const [showAuthModal, setShowAuthModal] = useState(false);
+            
+                // Portfolio Data
+                const [portfolio, setPortfolio] = useState<Portfolio>({ BTC: [], ETH: [], BNB: [], SOL: [] });
+                const [isLoadingData, setIsLoadingData] = useState(true);
+            
+                // Alerts Refresh Trigger
+                const [refreshTrigger, setRefreshTrigger] = useState(0);
+            
+                // Lock Screen State
+                const [isLocked, setIsLocked] = useState(false);
+                const [lockPin, setLockPin] = useState('');
+            
+                // Modal State
+                const [modal, setModal] = useState({
+                    isOpen: false,
+                    mode: 'add', // 'add' | 'edit'
+                    coin: '',
+                    parentIdx: null as number | null,
+                    childIdx: null as number | null,
+                    data: {
+                        entry: '',
+                        amount: '',
+                        tp: '',
+                        sl: '',
+                        risk: '',
+                        currency: 'USDT',
+                        date: '',
+                        time: ''
+                    },
+                    // ניהול אסטרטגיה בתוך המודל
+                    strategy: {
+                        isActive: false,      // האם הופעלה אסטרטגיה
+                        hedgesCount: 2,       // ברירת מחדל לבחירה
+                        riskPercent: 0,       // האחוז שנבחר
+                        currentHedgeIndex: 1, // מספר הגידור הנוכחי (1, 2, 3...)
+                        calculatedSetups: [] as HedgeSetup[] // מערך החישובים המלא
+                    },
+                    createAlerts: false // הפעמון
+                });
+            
+                // Delete Confirmation State
+                const [deleteModal, setDeleteModal] = useState<{
+                    isOpen: boolean;
+                    type: 'spot' | 'short' | null;
+                    coin: string;
+                    index: number | null;
+                    shortIndex: number | null;
+                }>({ isOpen: false, type: null, coin: '', index: null, shortIndex: null });
+            
+                // --- Helpers for Persistence ---
+                const updateLockState = (locked: boolean) => {
+                    setIsLocked(locked);
+                    if (typeof window !== 'undefined') {
+                        localStorage.setItem('tradeWall_isLocked', locked.toString());
+                    }
+                };
+            
+                // --- Effects ---
+            
+                // 1. Check User Session on Mount
+                useEffect(() => {
+                    const getUser = async () => {
+                        const { data: { session } } = await supabase.auth.getSession();
+                        setUser(session?.user || null);
+                        if (session?.user) {
+                            fetchPortfolio(session.user.id);
+                        } else {
+                            fetchPortfolio(null);
+                        }
+                    };
+                    getUser();
+            
+                    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+                        setUser(session?.user || null);
+                        if (!session) {
+                            setPortfolio({ BTC: [], ETH: [], BNB: [], SOL: [] });
+                        } else {
+                            fetchPortfolio(session.user.id);
+                        }
+                    });
+            
+                    return () => subscription.unsubscribe();
+                }, []);
+            
+                // 2. Initial Load & WebSocket & Restore Lock State
+                useEffect(() => {
+                    if (typeof window !== 'undefined') {
+                        const savedLockState = localStorage.getItem('tradeWall_isLocked');
+                        if (savedLockState === 'true') {
+                            setIsLocked(true);
+                        }
+                    }
+            
+                    // --- WebSocket Logic ---
+                    let ws: WebSocket | null = null;
+                    let reconnectTimer: NodeJS.Timeout | null = null;
+            
+                    const connectWebSocket = () => {
+                        if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+                            return;
+                        }
+            
+                        console.log('Connecting to Binance WebSocket...');
+                        ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@miniTicker/ethusdt@miniTicker/bnbusdt@miniTicker/solusdt@miniTicker');
+            
+                        ws.onopen = () => {
+                            console.log('WebSocket Connected');
+                        };
+            
+                        ws.onmessage = (event) => {
+                            const data = JSON.parse(event.data);
+                            const symbol = data.s.replace('USDT', '');
+                            const price = parseFloat(data.c);
+                            setPrices(prev => ({ ...prev, [symbol]: price }));
+                        };
+            
+                        ws.onclose = () => {
+                            console.log('WebSocket Closed. Reconnecting in 3s...');
+                            reconnectTimer = setTimeout(connectWebSocket, 3000);
+                        };
+            
+                        ws.onerror = (err) => {
+                            console.error('WebSocket Error:', err);
+                            ws?.close();
+                        };
+                    };
+            
+                    connectWebSocket();
+            
+                    const handleVisibilityChange = () => {
+                        if (document.visibilityState === 'visible') {
+                            if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+                                if (reconnectTimer) clearTimeout(reconnectTimer);
+                                connectWebSocket();
+                            }
+                        }
+                    };
+            
+                    document.addEventListener('visibilitychange', handleVisibilityChange);
+            
+                    return () => {
+                        document.removeEventListener('visibilitychange', handleVisibilityChange);
+                        if (reconnectTimer) clearTimeout(reconnectTimer);
+                        if (ws) ws.close();
+                    };
+                }, []); 
+            
+                // --- Helpers & Supabase Logic ---
+            
+                const fetchPortfolio = async (userId: string | null) => {
+                    setIsLoadingData(true);
+                    
+                    let query = supabase
+                        .from('positions')
+                        .select('*')
+                        .order('created_at', { ascending: true });
+            
+                    if (userId) {
+                        query = query.eq('user_id', userId);
+                    } else {
+                         query = query.is('user_id', null);
+                    }
+            
+                    const { data, error } = await query;
+            
+                    if (error) {
+                        console.error('Error fetching data:', error);
+                        setIsLoadingData(false);
+                        return;
+                    }
+            
+                    if (data) {
+                        const newPortfolio: Portfolio = { BTC: [], ETH: [], BNB: [], SOL: [] };
+            
+                        const spots = data.filter(item => item.parent_id === null);
+                        spots.forEach(spot => {
+                            if (newPortfolio[spot.symbol]) {
+                                newPortfolio[spot.symbol].push({
+                                    ...spot, 
+                                    entry: Number(spot.entry),
+                                    amount: Number(spot.amount),
+                                    tp: Number(spot.tp),
+                                    sl: Number(spot.sl),
+                                    risk: Number(spot.risk),
+                                    shorts: []
+                                });
+                            }
+                        });
+            
+                        const shorts = data.filter(item => item.parent_id !== null);
+                        shorts.forEach(short => {
+                            const coin = short.symbol;
+                            if (newPortfolio[coin]) {
+                                const parentSpot = newPortfolio[coin].find(p => p.id === short.parent_id);
+                                if (parentSpot) {
+                                    parentSpot.shorts.push({
+                                        ...short,
+                                        entry: Number(short.entry),
+                                        amount: Number(short.amount),
+                                        tp: Number(short.tp),
+                                        sl: Number(short.sl),
+                                        risk: Number(short.risk),
+                                        shorts: []
+                                    });
+                                }
+                            }
+                        });
+            
+                        setPortfolio(newPortfolio);
+                    }
+                    setIsLoadingData(false);
+                };
+            
+                // --- Modal & Strategy Logic ---
+            
+                const calculateModalValues = () => {
+                    const entry = parseFloat(modal.data.entry);
+                    const amount = parseFloat(modal.data.amount);
+                    const tp = parseFloat(modal.data.tp);
+                    const sl = parseFloat(modal.data.sl);
+            
+                    let calcInvest = 0;
+                    let calcProfit = 0;
+                    let calcRisk = 0;
+            
+                    const isSpot = (modal.mode === 'add' && modal.parentIdx === null) || (modal.mode === 'edit' && modal.childIdx === null);
+            
+                    if (entry && !isNaN(entry) && amount && !isNaN(amount)) {
+                        calcInvest = amount * entry;
+            
+                        // רווח פוטנציאלי (TP)
+                        if (tp && !isNaN(tp)) {
+                            if (isSpot) calcProfit = (tp - entry) * amount;
+                            else calcProfit = Math.abs(entry - tp) * amount; // שורט
+                        }
+            
+                        // סיכון פוטנציאלי (SL) - זה מה שנציג במודל
+                        if (sl && !isNaN(sl)) {
+                            if (isSpot) calcRisk = (entry - sl) * amount; // לונג: הפסד כשהמחיר יורד
+                            else calcRisk = Math.abs(sl - entry) * amount; // שורט: הפסד כשהמחיר עולה
+                        } else {
+                            // אם אין סטופ, לוקחים את הריסק מהשדה הידני אם הוזן
+                            calcRisk = parseFloat(modal.data.risk) || 0;
+                        }
+                    }
+            
+                    return { calcInvest, calcProfit, calcRisk };
+                };
+            
+                const handleModalInput = (field: string, value: string) => {
+                    const newData = { ...modal.data, [field]: value };
+                    
+                    if (modal.strategy.isActive && modal.parentIdx !== null && (field === 'entry' || field === 'sl')) {
+                        const spot = portfolio[modal.coin][modal.parentIdx];
+                        const newEntry = field === 'entry' ? parseFloat(value) : parseFloat(modal.data.entry);
+                        const newSL = field === 'sl' ? parseFloat(value) : parseFloat(modal.data.sl);
+            
+                        if (!isNaN(newEntry) && !isNaN(newSL) && spot) {
+                            const newSetups = calculateHedgeStrategy(
+                                spot.entry,
+                                newSL,
+                                spot.amount,
+                                modal.strategy.riskPercent,
+                                modal.strategy.hedgesCount,
+                                newEntry
+                            );
+            
+                            const currentSetupIdx = modal.strategy.currentHedgeIndex - 1;
+                            const updatedSetup = newSetups[currentSetupIdx];
+            
+                            if (updatedSetup) {
+                                newData.amount = updatedSetup.coinAmount.toString();
+                                newData.risk = updatedSetup.riskAmount.toString();
+                                newData.tp = updatedSetup.tp.toString();
+                            }
+            
+                            setModal(prev => ({
+                                ...prev,
+                                data: newData,
+                                strategy: {
+                                    ...prev.strategy,
+                                    calculatedSetups: newSetups
+                                }
+                            }));
+                            return;
+                        }
+                    }
+            
+                    setModal(prev => ({ ...prev, data: newData }));
+                };
+            
+                const applyHedgeStrategy = (percent: number) => {
+                    if (modal.parentIdx === null) return;
+                    
+                    const spot = portfolio[modal.coin][modal.parentIdx];
+                    if (!spot) return;
+            
+                    const currentFormEntry = parseFloat(modal.data.entry);
+                    const startPrice = !isNaN(currentFormEntry) ? currentFormEntry : spot.entry;
+                    
+                    const currentFormSL = parseFloat(modal.data.sl);
+                    const targetSL = !isNaN(currentFormSL) ? currentFormSL : spot.tp;
+            
+                    const setups = calculateHedgeStrategy(
+                        spot.entry,
+                        targetSL,
+                        spot.amount,
+                        percent, 
+                        modal.strategy.hedgesCount,
+                        startPrice
+                    );
+            
+                    const nextHedgeIdx = modal.strategy.currentHedgeIndex - 1; 
+                    const setupToApply = setups[nextHedgeIdx];
+            
+                    if (setupToApply) {
+                        setModal(prev => ({
+                            ...prev,
+                            strategy: {
+                                ...prev.strategy,
+                                isActive: true,
+                                riskPercent: percent,
+                                calculatedSetups: setups,
+                            },
+                            data: {
+                                ...prev.data,
+                                entry: setupToApply.entry.toString(),
+                                tp: setupToApply.tp.toString(),
+                                sl: setupToApply.sl.toString(),
+                                amount: setupToApply.coinAmount.toString(),
+                                risk: setupToApply.riskAmount.toString(),
+                            }
+                        }));
+                    }
+                };
+            
+                const { calcInvest: modalInvest, calcProfit: modalProfit, calcRisk: modalRisk } = calculateModalValues();
+            
+                const openModal = (mode: 'add' | 'edit', coin: string, parentIdx: number | null = null, childIdx: number | null = null) => {
+                    if (!user) {
+                        setShowAuthModal(true);
+                        return;
+                    }
+            
+                    const now = new Date();
+                    const defaultDate = now.toISOString().split('T')[0];
+                    const defaultTime = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            
+                    let initialData = {
+                        entry: prices[coin]?.toString() || '',
+                        amount: '',
+                        tp: '',
+                        sl: '',
+                        risk: '',
+                        currency: 'USDT',
+                        date: defaultDate,
+                        time: defaultTime
+                    };
+            
+                    let strategyState = {
+                        isActive: false,
+                        hedgesCount: 2, 
+                        riskPercent: 0,
+                        currentHedgeIndex: 1,
+                        calculatedSetups: [] as HedgeSetup[]
+                    };
+            
+                    if (mode === 'add' && parentIdx !== null) {
+                        const spot = portfolio[coin][parentIdx];
+                        if (spot.tp) {
+                            initialData.sl = spot.tp.toString();
+                        }
+            
+                        const nextHedgeNum = spot.shorts.length + 1;
+                        strategyState.currentHedgeIndex = nextHedgeNum;
+            
+                        // עדכון: מאפשר חישוב גם לגידור הראשון אם יש נתונים בספוט
+                        if (spot.strategy_risk_percent && spot.strategy_hedges_count) {
+                            const setups = calculateHedgeStrategy(
+                                spot.entry,
+                                spot.tp,
+                                spot.amount,
+                                spot.strategy_risk_percent,
+                                spot.strategy_hedges_count
+                            );
+                            
+                            const setupToApply = setups[spot.shorts.length]; 
+                            
+                            if (setupToApply) {
+                                initialData.entry = setupToApply.entry.toString();
+                                initialData.tp = setupToApply.tp.toString();
+                                initialData.sl = setupToApply.sl.toString();
+                                initialData.amount = setupToApply.coinAmount.toString();
+                                initialData.risk = setupToApply.riskAmount.toString();
+                                
+                                strategyState.isActive = true;
+                                strategyState.hedgesCount = spot.strategy_hedges_count;
+                                strategyState.riskPercent = spot.strategy_risk_percent;
+                                strategyState.calculatedSetups = setups;
+                            }
+                        }
+                    }
+            
+                    if (mode === 'edit') {
+                        if (parentIdx !== null && childIdx === null) {
+                            const p = portfolio[coin][parentIdx];
+                            initialData = { ...initialData, entry: p.entry.toString(), amount: p.amount.toString(), tp: p.tp.toString(), sl: p.sl.toString(), risk: p.risk.toString(), currency: p.currency };
+                        } else if (parentIdx !== null && childIdx !== null) {
+                            const s = portfolio[coin][parentIdx].shorts[childIdx];
+                            initialData = { ...initialData, entry: s.entry.toString(), amount: s.amount.toString(), tp: s.tp.toString(), sl: s.sl.toString(), risk: s.risk.toString(), currency: s.currency };
+                        }
+                    }
+            
+                    setModal({
+                        isOpen: true,
+                        mode,
+                        coin,
+                        parentIdx,
+                        childIdx,
+                        data: initialData,
+                        strategy: strategyState,
+                        createAlerts: false
+                    });
+                };
+            
+                const savePosition = async () => {
+                    if (!user) return;
+            
+                    const { coin, parentIdx, childIdx, mode, data, strategy, createAlerts } = modal;
+                    const entry = parseFloat(data.entry);
+                    const amount = parseFloat(data.amount);
+            
+                    if (!entry || !amount) {
+                        alert("נא למלא מחיר וכמות");
+                        return;
+                    }
+            
+                    const tpVal = parseFloat(data.tp) || 0;
+                    const slVal = parseFloat(data.sl) || 0;
+            
+                    const dbPayload: any = {
+                        symbol: coin,
+                        entry: entry,
+                        amount: amount,
+                        tp: tpVal,
+                        sl: slVal,
+                        risk: parseFloat(data.risk) || 0,
+                        currency: data.currency,
+                        trade_date: data.date,
+                        trade_time: data.time,
+                        user_id: user.id
+                    };
+            
+                    try {
+                        let savedRecord: any = null;
+            
+                        if (mode === 'add') {
+                            if (parentIdx === null) {
+                                dbPayload.parent_id = null;
+                                const { data: inserted, error } = await supabase.from('positions').insert([dbPayload]).select();
+                                if (error) throw error;
+                                savedRecord = inserted[0];
+                            } else {
+                                const parentSpot = portfolio[coin][parentIdx];
+                                if (!parentSpot?.id) throw new Error("Parent ID not found");
+                                dbPayload.parent_id = parentSpot.id;
+                                
+                                if (strategy.isActive && (parentSpot.shorts.length === 0 || strategy.currentHedgeIndex === 1)) {
+                                    await supabase.from('positions').update({
+                                        strategy_hedges_count: strategy.hedgesCount,
+                                        strategy_risk_percent: strategy.riskPercent
+                                    }).eq('id', parentSpot.id);
+                                }
+            
+                                const { data: inserted, error } = await supabase.from('positions').insert([dbPayload]).select();
+                                if (error) throw error;
+                                savedRecord = inserted[0];
+                            }
+            
+                        } else {
+                            let idToUpdate = '';
+                            if (childIdx === null && parentIdx !== null) idToUpdate = portfolio[coin][parentIdx].id;
+                            else if (parentIdx !== null && childIdx !== null) idToUpdate = portfolio[coin][parentIdx].shorts[childIdx].id;
+                            const { data: updated, error } = await supabase.from('positions').update(dbPayload).eq('id', idToUpdate).select();
+                            if (error) throw error;
+                            savedRecord = updated[0];
+                        }
+            
+                        if (createAlerts && savedRecord) {
+                            const alertsToCreate = [];
+            
+                            if (parentIdx === null) {
+                                if (tpVal > 0) alertsToCreate.push({ coin, target_price: tpVal, condition: 'above', note: `Spot ${coin} TP Hit - Close All`, user_id: user.id });
+                                if (slVal > 0) alertsToCreate.push({ coin, target_price: slVal, condition: 'below', note: `Spot ${coin} SL Hit`, user_id: user.id });
+                            } else {
+                                if (tpVal > 0) alertsToCreate.push({ 
+                                    coin, target_price: tpVal, condition: 'below', 
+                                    note: `Hedge ${strategy.currentHedgeIndex} (${coin}) TP`, user_id: user.id 
+                                });
+                                if (slVal > 0) alertsToCreate.push({ 
+                                    coin, target_price: slVal, condition: 'above', 
+                                    note: `Hedge ${strategy.currentHedgeIndex} (${coin}) SL`, user_id: user.id 
+                                });
+            
+                                if (strategy.calculatedSetups && strategy.calculatedSetups.length > 0) {
+                                    const nextSetup = strategy.calculatedSetups.find(s => s.index === strategy.currentHedgeIndex + 1);
+                                    
+                                    if (nextSetup) {
+                                        alertsToCreate.push({
+                                            coin: coin,
+                                            target_price: nextSetup.entry,
+                                            condition: 'above',
+                                            note: `⚠️ ENTER HEDGE ${nextSetup.index} NOW! ($${nextSetup.entry})`,
+                                            user_id: user.id
+                                        });
+                                    }
+                                }
+                            }
+            
+                            if (alertsToCreate.length > 0) {
+                                await supabase.from('alerts').insert(alertsToCreate);
+                                // עדכון טריגר לרענון התראות בזמן אמת
+                                setRefreshTrigger(prev => prev + 1);
+                            }
+                        }
+            
+                        await fetchPortfolio(user.id);
+                        setModal(prev => ({ ...prev, isOpen: false }));
+            
+                    } catch (err: any) {
+                        console.error("Error saving position:", err.message);
+                        alert("שגיאה בשמירה: " + err.message);
+                    }
+                };
+            
+                const confirmDelete = async () => {
+                    const { type, coin, index, shortIndex } = deleteModal;
+                    try {
+                        let idToDelete = '';
+                        let deleteFilterNote = ''; 
+            
+                        if (type === 'spot' && index !== null) {
+                            idToDelete = portfolio[coin][index].id;
+                            deleteFilterNote = 'Spot';
+                        } else if (type === 'short' && index !== null && shortIndex !== null) {
+                            idToDelete = portfolio[coin][index].shorts[shortIndex].id;
+                            deleteFilterNote = `Hedge ${shortIndex + 1}`; 
+                        }
+            
+                        if (!idToDelete) return;
+            
+                        const { error } = await supabase.from('positions').delete().eq('id', idToDelete);
+                        if (error) throw error;
+            
+                        if (type === 'spot') {
+                            await supabase.from('alerts').delete()
+                                .eq('coin', coin)
+                                .eq('user_id', user.id);
+                            setRefreshTrigger(prev => prev + 1);
+                        } else {
+                            const { data: alerts } = await supabase.from('alerts').select('id, note').eq('coin', coin).eq('user_id', user.id);
+                            if (alerts) {
+                                const idsToDelete = alerts
+                                    .filter(a => a.note && a.note.includes(deleteFilterNote))
+                                    .map(a => a.id);
+                                
+                                if (idsToDelete.length > 0) {
+                                    await supabase.from('alerts').delete().in('id', idsToDelete);
+                                    setRefreshTrigger(prev => prev + 1);
+                                }
+                            }
+                        }
+            
+                        await fetchPortfolio(user ? user.id : null);
+                        setDeleteModal({ isOpen: false, type: null, coin: '', index: null, shortIndex: null });
+            
+                    } catch (err: any) {
+                        alert("שגיאה במחיקה: " + err.message);
+                    }
+                };
+            
+                const renderPortfolio = () => {
+                    if (isLocked) {
+                        return (
+                            <div className="lock-container">
+                                <div className="lock-icon">🔒</div>
+                                <h3 style={{ marginBottom: 20 }}>הפורטפוליו נעול</h3>
+                                <input type="password" value={lockPin} onChange={e => setLockPin(e.target.value)}
+                                    className="glass-input lock-input" placeholder="****" maxLength={6} />
+                                <button onClick={() => { if (lockPin === SECRET_PIN) { updateLockState(false); setLockPin(''); } else alert('סיסמה שגויה!'); }}
+                                    className="btn-action btn-add-spot" style={{ width: 200, marginTop: 20 }}>פתיחה</button>
+                            </div>
+                        );
+                    }
+            
+                    const strategies = portfolio[activeTab] || [];
+                    const currentPrice = prices[activeTab] || 0;
+            
+                    if (isLoadingData) return <div style={{ textAlign: 'center', padding: 40, opacity: 0.8 }}>טוען נתונים...</div>;
+                    if (!user && strategies.length === 0) return <div style={{ textAlign: 'center', padding: 40, opacity: 0.8 }}><p style={{fontSize:'1.1rem', marginBottom:15}}>נא להתחבר כדי לנהל פוזיציות</p><button className="btn-action" style={{background:'#6c5ce7', color:'white', width:150}} onClick={() => setShowAuthModal(true)}>התחברות</button></div>;
+                    if (strategies.length === 0) return <div style={{ textAlign: 'center', padding: 40, opacity: 0.5 }}><p style={{ fontSize: '1.2rem', marginBottom: 10 }}>הפורטפוליו ריק</p><button className="btn-action btn-add-spot" style={{ width: 200 }} onClick={() => openModal('add', activeTab)}>+ פתח פוזיציית ספוט</button></div>;
+            
+                    return (
+                        <div className="tab-content active" style={{ direction: 'rtl', paddingLeft: '12px' }}>
+                            <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <button className="icon-btn" onClick={() => updateLockState(true)} title="נעל מסך">🔒</button>
+                                <button className="btn-action btn-add-spot" style={{ width: 'auto', padding: '8px 20px' }} onClick={() => openModal('add', activeTab)}>+ הוסף ספוט חדש</button>
+                            </div>
+            
+                            {strategies.map((spot, idx) => {
+                                const spotValue = spot.amount * currentPrice;
+                                const spotCost = spot.amount * spot.entry;
+                                const spotPnL = spotValue - spotCost;
+                                let totalShortPnL = 0;
+            
+                                const projectedSpotWin = (spot.tp - spot.entry) * spot.amount;
+                                let projectedShortLossAtTP = 0;
+                                let projectedShortWinAtSL = 0;
+            
+                                spot.shorts.forEach(s => {
+                                    if (spot.tp) projectedShortLossAtTP += (s.entry - spot.tp) * s.amount;
+                                    if (spot.sl) projectedShortWinAtSL += (s.entry - spot.sl) * s.amount;
+                                });
+            
+                                const netAtTP = projectedSpotWin + projectedShortLossAtTP;
+                                const netAtSL = (spot.sl ? (spot.sl - spot.entry) * spot.amount : 0) + projectedShortWinAtSL;
+            
+                                return (
+                                    <div key={idx} className="strategy-card">
+                                        <div className="strategy-header">
+                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <span className="badge badge-long" style={{ fontSize: '0.9rem' }}>SPOT LONG ({spot.currency || 'USDT'})</span>
+                                                {spot.trade_date && <span style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: 4 }}>{spot.trade_date} {spot.trade_time}</span>}
+                                            </div>
+                                            <div>
+                                                <button className="icon-btn btn-edit" onClick={() => openModal('edit', activeTab, idx)}>✎</button>
+                                                <button className="icon-btn btn-delete" onClick={() => setDeleteModal({ isOpen: true, type: 'spot', coin: activeTab, index: idx, shortIndex: null })}>🗑</button>
+                                            </div>
+                                        </div>
+            
+                                        <div className="data-row">
+                                            <span>כניסה: <strong>${spot.entry}</strong></span>
+                                            <span>יעד: <span style={{ color: '#00b894' }}>{spot.tp ? `$${spot.tp}` : '-'}</span></span>
+                                        </div>
+                                        <div className="data-row">
+                                            <span>כמות: {spot.amount}</span>
+                                            <span>סטופ: <span style={{ color: '#ff7675' }}>{spot.sl ? `$${spot.sl}` : '-'}</span></span>
+                                        </div>
+                                        <div className="data-row">
+                                            <span>PNL ספוט:</span>
+                                            <span className={spotPnL >= 0 ? 'val-profit' : 'val-loss'}>{spotPnL >= 0 ? '+' : ''}${spotPnL.toFixed(2)}</span>
+                                        </div>
+            
+                                        {spot.shorts.map((short, sIdx) => {
+                                            const shortPnL = (short.entry - currentPrice) * short.amount;
+                                            totalShortPnL += shortPnL;
+                                            return (
+                                                <div key={sIdx} className="sub-card">
+                                                    <div className="strategy-header" style={{ marginBottom: 8, border: 'none', padding: 0 }}>
+                                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                            <span className="badge badge-short">Hedge {sIdx + 1} ({short.currency || 'USDT'})</span>
+                                                            {short.trade_date && <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>{short.trade_date} {short.trade_time}</span>}
+                                                        </div>
+                                                        <div>
+                                                            <button className="icon-btn btn-edit" onClick={() => openModal('edit', activeTab, idx, sIdx)}>✎</button>
+                                                            <button className="icon-btn btn-delete" onClick={() => setDeleteModal({ isOpen: true, type: 'short', coin: activeTab, index: idx, shortIndex: sIdx })}>×</button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="data-row">
+                                                        <span>כניסה: ${short.entry}</span>
+                                                        <span>כמות: {short.amount}</span>
+                                                    </div>
+                                                    <div className="data-row" style={{ fontSize: '0.85rem', opacity: 0.8 }}>
+                                                        <span>TP: {short.tp || '-'}</span>
+                                                        <span>SL: {short.sl || '-'}</span>
+                                                    </div>
+                                                    <div className="data-row">
+                                                        <span>רווח/הפסד:</span>
+                                                        <span className={shortPnL >= 0 ? 'val-profit' : 'val-loss'}>{shortPnL >= 0 ? '+' : ''}${shortPnL.toFixed(2)}</span>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+            
+                                        {spot.shorts.length < 4 && (
+                                            <button className="btn-action btn-add-short" onClick={() => openModal('add', activeTab, idx)}>+ הוסף גידור (Short)</button>
+                                        )}
+            
+                                        {(spot.tp || spot.sl) && (
+                                            <div className="projection-box">
+                                                <div><strong>תחזית (PNL משוער):</strong></div>
+                                                {spot.tp > 0 && (
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+                                                        <span>ב-TP (${spot.tp}):</span>
+                                                        <span style={{ color: netAtTP >= 0 ? '#00ff88' : '#ff4d4d' }}>{netAtTP >= 0 ? '+' : ''}${netAtTP.toFixed(2)}</span>
+                                                    </div>
+                                                )}
+                                                {spot.sl > 0 && (
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                        <span>ב-SL (${spot.sl}):</span>
+                                                        <span style={{ color: netAtSL >= 0 ? '#00ff88' : '#ff4d4d' }}>{netAtSL >= 0 ? '+' : ''}${netAtSL.toFixed(2)}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+            
+                                        <div className="total-pnl-box">
+                                            <div style={{ fontSize: '0.9rem', marginBottom: 5 }}>סה"כ רווח/הפסד אסטרטגיה:</div>
+                                            <div className={`big-pnl ${(spotPnL + totalShortPnL) >= 0 ? 'val-profit' : 'val-loss'}`}>
+                                                {(spotPnL + totalShortPnL) >= 0 ? '+' : ''}${(spotPnL + totalShortPnL).toFixed(2)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    );
+                };
+            
+                return (
+                    <main>
+                        <div className="wallpaper-bg"></div>
+                        <div className="main-container">
+                            <LiveTicker
+                                prices={prices}
+                                onCoinClick={(coin) => { setActiveTab(coin); }}
+                                userId={user?.id || null}
+                                refreshTrigger={refreshTrigger}
+                            />
+                            <div className="glass-panel calc-col">
+                                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:15}}>
+                                    <div style={{fontSize:'0.9rem', opacity:0.8}}>
+                                        {user ? (<span>מחובר: <span style={{color:'#00b894', fontWeight:'bold'}}>{user.email?.split('@')[0]}</span></span>) : (<span>אורח</span>)}
+                                    </div>
+                                    <div>
+                                        {user ? (
+                                            <button onClick={async () => { await supabase.auth.signOut(); }} className="btn-action" style={{background:'transparent', border:'1px solid rgba(255,255,255,0.2)', padding:'4px 12px', fontSize:'0.8rem', width:'auto'}}>התנתק</button>
+                                        ) : (
+                                            <button onClick={() => setShowAuthModal(true)} className="btn-action" style={{background:'#6c5ce7', padding:'4px 12px', fontSize:'0.8rem', width:'auto'}}>התחבר/הרשם</button>
+                                        )}
+                                    </div>
+                                </div>
+            
+                                <div className="tabs-container">
+                                    <button className={`tab-btn ${activeTab === 'calc' ? 'active' : ''}`} onClick={() => setActiveTab('calc')}>מחשבון</button>
+                                    <button className={`tab-btn ${activeTab === 'shortcuts' ? 'active' : ''}`} onClick={() => setActiveTab('shortcuts')}>קיצורים</button>
+                                    {COINS.map(c => (
+                                        <button key={c} className={`tab-btn ${activeTab === c ? 'active' : ''}`} onClick={() => setActiveTab(c)}>{c}</button>
+                                    ))}
+                                </div>
+            
+                                {activeTab === 'calc' && <RiskCalculator prices={prices} />}
+                                {activeTab === 'shortcuts' && <KeyboardShortcuts />}
+                                {COINS.includes(activeTab) && renderPortfolio()}
+                            </div>
+                        </div>
+            
+                        <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+            
+                        {modal.isOpen && (
+                            <>
+                                <div className="modal-overlay" onClick={() => setModal({ ...modal, isOpen: false })}></div>
+                                <div className="glass-panel modal-content" style={{width: 420}}>
+                                    <h3 style={{ textAlign: 'center', marginBottom: 20 }}>
+                                        {modal.mode === 'add'
+                                            ? (modal.parentIdx === null ? `הוספת ספוט ${modal.coin}` : `הוספת גידור (Hedge ${modal.strategy.currentHedgeIndex})`)
+                                            : 'עריכת פוזיציה'
+                                        }
+                                    </h3>
+            
+                                    {modal.mode === 'add' && modal.parentIdx !== null && modal.strategy.currentHedgeIndex === 1 && (
+                                        <div style={{marginBottom: 20, padding: 10, background: 'rgba(255,255,255,0.05)', borderRadius: 10}}>
+                                            <div style={{fontSize:'0.85rem', marginBottom: 8, textAlign:'center'}}>בחר אסטרטגיה (תחול על כל הגידורים):</div>
+                                            <div style={{display:'flex', justifyContent:'center', gap:5, marginBottom:10}}>
+                                                {[2,3,4].map(num => (
+                                                    <button 
+                                                        key={num}
+                                                        onClick={() => setModal(prev => ({...prev, strategy: {...prev.strategy, hedgesCount: num}}))}
+                                                        style={{
+                                                            background: modal.strategy.hedgesCount === num ? '#00b894' : '#333',
+                                                            border: 'none', borderRadius: 4, padding: '4px 10px', color: 'white', cursor:'pointer', fontSize: '0.8rem'
+                                                        }}
+                                                    >
+                                                        {num} גידורים
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div style={{display:'flex', gap: 5, justifyContent: 'center'}}>
+                                                {[25, 50, 75, 100].map(pct => (
+                                                    <button 
+                                                        key={pct}
+                                                        onClick={() => applyHedgeStrategy(pct)}
+                                                        className="btn-action"
+                                                        style={{
+                                                            background: modal.strategy.riskPercent === pct ? '#6c5ce7' : 'rgba(255,255,255,0.1)',
+                                                            fontSize: '0.8rem', padding: '6px 12px', border: '1px solid rgba(255,255,255,0.1)', width: 'auto'
+                                                        }}
+                                                    >
+                                                        {pct}% סיכון
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+            
+                                    <div style={{ display: 'flex', gap: 10 }}>
+                                         <div className="input-group" style={{ flex: 1 }}>
+                                            <label>תאריך</label>
+                                            <input type="date" className="glass-input" value={modal.data.date} onChange={e => handleModalInput('date', e.target.value)} />
+                                         </div>
+                                         <div className="input-group" style={{ flex: 1 }}>
+                                            <label>שעה</label>
+                                            <input type="time" className="glass-input" value={modal.data.time} onChange={e => handleModalInput('time', e.target.value)} />
+                                         </div>
+                                    </div>
+            
+                                    <div className="input-group">
+                                        <label>מחיר כניסה ($)</label>
+                                        <input type="number" className="glass-input" value={modal.data.entry} onChange={e => handleModalInput('entry', e.target.value)} />
+                                    </div>
+            
+                                    <div style={{ display: 'flex', gap: 10 }}>
+                                        <div className="input-group" style={{ flex: 1 }}>
+                                            <label>TP (יעד)</label>
+                                            <input type="number" className="glass-input" value={modal.data.tp} onChange={e => handleModalInput('tp', e.target.value)} />
+                                        </div>
+                                        <div className="input-group" style={{ flex: 1 }}>
+                                            <label>SL (סטופ)</label>
+                                            <input type="number" className="glass-input" value={modal.data.sl} onChange={e => handleModalInput('sl', e.target.value)} />
+                                        </div>
+                                    </div>
+            
+                                    {/* תצוגת רווח/הפסד פוטנציאלי */}
+                                    <div style={{
+                                        display:'flex', justifyContent:'space-around', alignItems:'center', 
+                                        marginBottom:12, padding:10, borderRadius:8, 
+                                        background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)'
+                                    }}>
+                                        <div style={{textAlign:'center'}}>
+                                            <div style={{fontSize:'0.75rem', opacity:0.8, marginBottom:2}}>הפסד פוטנציאלי (Risk)</div>
+                                            <div style={{color:'#ff7675', fontWeight:'bold', fontFamily:'monospace', fontSize:'1rem'}}>
+                                                -${modalRisk.toLocaleString(undefined, {maximumFractionDigits:2})}
+                                            </div>
+                                        </div>
+                                        <div style={{width:1, height:30, background:'rgba(255,255,255,0.2)'}}></div>
+                                        <div style={{textAlign:'center'}}>
+                                            <div style={{fontSize:'0.75rem', opacity:0.8, marginBottom:2}}>רווח פוטנציאלי (Reward)</div>
+                                            <div style={{color:'#00b894', fontWeight:'bold', fontFamily:'monospace', fontSize:'1rem'}}>
+                                                +${modalProfit.toLocaleString(undefined, {maximumFractionDigits:2})}
+                                            </div>
+                                        </div>
+                                    </div>
+            
+                                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10}}>
+                                         <div className="investment-highlight">
+                                            <span style={{fontSize:'0.7rem', opacity:0.7}}>כמות (Coins)</span>
+                                            <input type="number" className="glass-input" style={{textAlign:'center', fontSize:'1rem', padding:5}} value={modal.data.amount} onChange={e => handleModalInput('amount', e.target.value)} />
+                                         </div>
+                                         <div className="investment-highlight">
+                                            <span style={{fontSize:'0.7rem', opacity:0.7}}>השקעה ($)</span>
+                                            <div className="investment-val" style={{fontSize:'1rem'}}>${modalInvest.toFixed(2)}</div>
+                                         </div>
+                                    </div>
+            
+                                    <div style={{marginTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', padding: 8, borderRadius: 8}} onClick={() => setModal(prev => ({...prev, createAlerts: !prev.createAlerts}))}>
+                                        <div style={{
+                                            width: 20, height: 20, borderRadius: 4, 
+                                            border: '2px solid #00b894', 
+                                            background: modal.createAlerts ? '#00b894' : 'transparent',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                        }}>
+                                            {modal.createAlerts && <span style={{color:'white', fontWeight:'bold', fontSize:'0.8rem'}}>✓</span>}
+                                        </div>
+                                        <span style={{fontSize: '0.9rem'}}>🔔 צור התראות אוטומטיות</span>
+                                    </div>
+                                    
+                                    {modal.createAlerts && modal.mode === 'add' && (
+                                        <div style={{textAlign:'center', fontSize:'0.75rem', color:'#00b894', marginTop:4, opacity: 0.8}}>
+                                            {modal.parentIdx === null 
+                                                ? "ייווצרו התראות TP ו-SL לספוט"
+                                                : `ייווצרו התראות לגידור ${modal.strategy.currentHedgeIndex}` + (modal.strategy.calculatedSetups.length > modal.strategy.currentHedgeIndex ? ` + כוננות לגידור הבא` : "")
+                                            }
+                                        </div>
+                                    )}
+            
+                                    <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+                                        <button onClick={savePosition} className="btn-action btn-add-spot" style={{ flex: 1 }}>
+                                            {modal.mode === 'add' ? 'שמור וצור' : 'עדכן'}
+                                        </button>
+                                        <button onClick={() => setModal({ ...modal, isOpen: false })} className="btn-action" style={{ flex: 1, background: '#333', color: '#ccc' }}>ביטול</button>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+            
+                        {deleteModal.isOpen && (
+                            <>
+                                <div className="modal-overlay" onClick={() => setDeleteModal({ ...deleteModal, isOpen: false })}></div>
+                                <div className="glass-panel modal-content confirm-modal">
+                                    <h3>מחיקת פוזיציה</h3>
+                                    <p>האם למחוק את הפוזיציה ואת ההתראות שלה?</p>
+                                    <div style={{ display: 'flex', gap: 10, marginTop:20 }}>
+                                        <button onClick={confirmDelete} className="btn-action" style={{ background: '#ff4d4d' }}>מחק</button>
+                                        <button onClick={() => setDeleteModal({ ...deleteModal, isOpen: false })} className="btn-action" style={{ background: '#333' }}>ביטול</button>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </main>
+                );
+            }
+
+        Folder: api
+
+            Folder: pushover
+                File: route.ts
+                    Code:
+                    // tradewall\src\app\api\pushover\route.ts
+                    
+                    import { NextResponse } from 'next/server';
+                    
+                    export async function POST(request: Request) {
+                      try {
+                        const { message, title } = await request.json();
+                    
+                        const userKey = process.env.PUSHOVER_USER_KEY;
+                        const token = process.env.PUSHOVER_API_TOKEN;
+                    
+                        if (!userKey || !token) {
+                          return NextResponse.json({ error: 'Missing Pushover keys in .env.local' }, { status: 500 });
+                        }
+                    
+                        // בניית המידע לשליחה לפי הדוקומנטציה (application/x-www-form-urlencoded)
+                        const formData = new URLSearchParams();
+                        formData.append('token', token);
+                        formData.append('user', userKey);
+                        formData.append('message', message);
+                        if (title) formData.append('title', title);
+                    
+                        // שליחת הבקשה ל-Pushover
+                        const res = await fetch('https://api.pushover.net/1/messages.json', {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                          },
+                          body: formData,
+                        });
+                    
+                        const data = await res.json();
+                    
+                        if (!res.ok || data.status !== 1) {
+                          throw new Error(data.errors ? data.errors.join(', ') : 'Failed to send notification');
+                        }
+                    
+                        return NextResponse.json({ success: true, request: data.request });
+                      } catch (error: any) {
+                        console.error('Pushover Error:', error.message);
+                        return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+                      }
+                    }
+
+        Folder: utils
+            File: hedgeLogic.ts
+                Code:
+                // src/app/utils/hedgeLogic.ts
+                
+                export interface HedgeSetup {
+                    index: number;         // מספר הגידור (1, 2, 3...)
+                    entry: number;         // מחיר כניסה
+                    tp: number;           // טייק פרופיט (יחס 1:1 לסיכון)
+                    sl: number;           // סטופ לוס (קבוע, שווה ל-Spot TP)
+                    riskAmount: number;    // כמה דולרים מסכנים בפוזיציה הזו
+                    potentialProfit: number; // רווח פוטנציאלי (אם מגיע ל-TP)
+                    coinAmount: number;    // כמה מטבעות צריך לקנות כדי לעמוד בסיכון
+                    investAmount: number;  // סה"כ דולרים להשקעה (Entry * CoinAmount)
+                }
+                
+                /**
+                 * מחשב אסטרטגיית גידור מדורגת (Layered Hedge Strategy)
+                 * @param spotEntry מחיר כניסה לספוט (משמש לחישוב בסיס הרווח)
+                 * @param spotTP מחיר יעד לספוט / סטופ לגידור (משמש לחישוב רווח וגם כגבול עליון)
+                 * @param spotAmount כמות מטבעות בספוט
+                 * @param riskPercent אחוז הסיכון הרצוי מתוך הרווח הפוטנציאלי (למשל 50 או 0.5)
+                 * @param hedgesCount מספר הגידורים הרצוי (2, 3, 4)
+                 * @param customStrategyStart (אופציונלי) מחיר התחלה ידני לגידור הראשון. אם לא סופק, ילקח ה-spotEntry
+                 */
+                export function calculateHedgeStrategy(
+                    spotEntry: number,
+                    spotTP: number,
+                    spotAmount: number,
+                    riskPercent: number, 
+                    hedgesCount: number,
+                    customStrategyStart?: number
+                ): HedgeSetup[] {
+                    
+                    // נרמול האחוז (אם התקבל 50, נהפוך ל-0.5)
+                    const normalizedPercent = riskPercent > 1 ? riskPercent / 100 : riskPercent;
+                
+                    // 1. חישוב הרווח הפוטנציאלי של הספוט (הבסיס לתקציב הסיכון)
+                    // התקציב תמיד נגזר מהפוזיציה המקורית
+                    const spotPotentialProfit = Math.abs(spotTP - spotEntry) * spotAmount;
+                    
+                    // 2. חישוב סך תקציב הסיכון לכל הגידורים יחד
+                    const totalRiskBudget = spotPotentialProfit * normalizedPercent;
+                    
+                    // 3. סיכון פר גידור בודד (חלוקה שווה)
+                    const riskPerHedge = totalRiskBudget / hedgesCount;
+                    
+                    // נקודת ההתחלה של רשת הגידורים (המשתמש יכול לשנות אותה)
+                    const gridStart = customStrategyStart !== undefined ? customStrategyStart : spotEntry;
+                    
+                    // 4. חישוב המרחק הכולל (הטווח בין כניסה לסטופ) לטובת המדרגות
+                    const totalDistance = spotTP - gridStart;
+                    
+                    const setups: HedgeSetup[] = [];
+                
+                    // 5. לולאת חישוב לכל גידור
+                    for (let i = 0; i < hedgesCount; i++) {
+                        // חישוב המיקום של הגידור על הסקאלה הלינארית
+                        // עבור 4 גידורים: 0%, 25%, 50%, 75%
+                        const ratio = i / hedgesCount; 
+                        
+                        // מחיר הכניסה לגידור הנוכחי
+                        const entry = gridStart + (totalDistance * ratio);
+                        
+                        // ה-SL תמיד קבוע = Spot TP
+                        const sl = spotTP;
+                        
+                        // המרחק לסטופ מהכניסה הנוכחית
+                        const distanceToSL = Math.abs(sl - entry);
+                        
+                        // חישוב כמות המטבעות: Risk = Amount * Distance
+                        const coinAmount = distanceToSL > 0 ? (riskPerHedge / distanceToSL) : 0;
+                        
+                        // חישוב TP ביחס 1:1 לסיכון
+                        // בגידור שורט, ה-TP נמוך ממחיר הכניסה
+                        const tp = entry - distanceToSL;
+                
+                        // חישוב רווח פוטנציאלי (מרחק ל-TP * כמות)
+                        const potentialProfit = Math.abs(entry - tp) * coinAmount;
+                        
+                        setups.push({
+                            index: i + 1,
+                            entry: parseFloat(entry.toFixed(4)),
+                            tp: parseFloat(tp.toFixed(4)),
+                            sl: parseFloat(sl.toFixed(4)),
+                            riskAmount: parseFloat(riskPerHedge.toFixed(2)),
+                            potentialProfit: parseFloat(potentialProfit.toFixed(2)),
+                            coinAmount: parseFloat(coinAmount.toFixed(6)),
+                            investAmount: parseFloat((entry * coinAmount).toFixed(2))
+                        });
+                    }
+                
+                    return setups;
+                }
+
+    Folder: components
+        File: AuthModal.tsx
+            Code:
+            import React, { useState } from 'react';
+            import { supabase } from '../lib/supabaseClient';
+            
+            interface AuthModalProps {
+                isOpen: boolean;
+                onClose: () => void;
+            }
+            
+            export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
+                const [isLogin, setIsLogin] = useState(true);
+                const [email, setEmail] = useState('');
+                const [password, setPassword] = useState('');
+                const [loading, setLoading] = useState(false);
+                const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
+            
+                if (!isOpen) return null;
+            
+                const handleAuth = async (e: React.FormEvent) => {
+                    e.preventDefault();
+                    setLoading(true);
+                    setMessage(null);
+            
+                    try {
+                        if (isLogin) {
+                            const { error } = await supabase.auth.signInWithPassword({
+                                email,
+                                password,
+                            });
+                            if (error) throw error;
+                            onClose(); // Close modal on success
+                        } else {
+                            const { error } = await supabase.auth.signUp({
+                                email,
+                                password,
+                                options: {
+                                    emailRedirectTo: `${window.location.origin}/`, // Redirect back to home after confirm
+                                },
+                            });
+                            if (error) throw error;
+                            setMessage({ text: 'נשלח מייל אימות! נא לבדוק את תיבת הדואר.', type: 'success' });
+                        }
+                    } catch (error: any) {
+                        setMessage({ text: error.message || 'שגיאה באימות', type: 'error' });
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+            
+                return (
+                    <>
+                        <div className="modal-overlay" onClick={onClose}></div>
+                        <div className="glass-panel modal-content" style={{ textAlign: 'center' }}>
+                            <h2 style={{ marginBottom: 20, fontWeight: 800 }}>
+                                {isLogin ? 'התחברות למערכת' : 'הרשמה למערכת'}
+                            </h2>
+            
+                            {message && (
+                                <div style={{
+                                    padding: 10,
+                                    borderRadius: 8,
+                                    marginBottom: 15,
+                                    fontSize: '0.9rem',
+                                    background: message.type === 'success' ? 'rgba(0, 184, 148, 0.2)' : 'rgba(255, 118, 117, 0.2)',
+                                    color: message.type === 'success' ? '#00b894' : '#ff7675',
+                                    border: `1px solid ${message.type === 'success' ? '#00b894' : '#ff7675'}`
+                                }}>
+                                    {message.text}
+                                </div>
+                            )}
+            
+                            <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
+                                <div className="input-group">
+                                    <label>אימייל</label>
+                                    <input
+                                        type="email"
+                                        required
+                                        className="glass-input"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        placeholder="name@example.com"
+                                    />
+                                </div>
+                                <div className="input-group">
+                                    <label>סיסמה</label>
+                                    <input
+                                        type="password"
+                                        required
+                                        className="glass-input"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        placeholder="******"
+                                        minLength={6}
+                                    />
+                                </div>
+            
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="btn-action"
+                                    style={{ background: isLogin ? '#6c5ce7' : '#00b894', color: 'white', marginTop: 10 }}
+                                >
+                                    {loading ? 'מעבד...' : (isLogin ? 'התחבר' : 'הירשם')}
+                                </button>
+                            </form>
+            
+                            <div style={{ marginTop: 20, fontSize: '0.9rem', opacity: 0.8 }}>
+                                {isLogin ? 'אין לך משתמש עדיין? ' : 'יש לך כבר משתמש? '}
+                                <button
+                                    onClick={() => { setIsLogin(!isLogin); setMessage(null); }}
+                                    style={{ background: 'none', border: 'none', color: '#74b9ff', cursor: 'pointer', fontWeight: 'bold', textDecoration: 'underline' }}
+                                >
+                                    {isLogin ? 'הירשם כאן' : 'התחבר כאן'}
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                );
+            }
+        File: KeyboardShortcuts.tsx
+            Code:
+            // tradewall\src\components\KeyboardShortcuts.tsx
+            
+            import React from 'react';
+            
+            export default function KeyboardShortcuts() {
+                return (
+                    <div className="tab-content active">
+                         <div className="calc-header">
+                            <h2>קיצורי מקלדת</h2>
+                            <p>ייעול עבודה בווינדוס</p>
+                        </div>
+                        <div className="shortcuts-grid">
+                            {[
+                                { keys: ['Win','Ctrl','D'], desc: 'יוצר שולחן עבודה וירטואלי חדש' },
+                                { keys: ['Win','Tab'], desc: 'מבט משימות / שולחנות עבודה' },
+                                { keys: ['Alt','Tab'], desc: 'מעבר מהיר בין חלונות' },
+                                { keys: ['Win','V'], desc: 'היסטוריית לוח (Clipboard)' },
+                                { keys: ['Win','Arrows'], desc: 'הצמדת חלונות לצדדים' },
+                                { keys: ['Ctrl','Shift','T'], desc: 'שחזור לשונית שנסגרה' },
+                                { keys: ['Win','Shift','S'], desc: 'צילום מסך (Snipping Tool)' },
+                                { keys: ['Win','E'], desc: 'פתיחת סייר הקבצים' },
+                            ].map((s, i) => (
+                                <div key={i} className="shortcut-card">
+                                    <div className="key-combo">
+                                        {s.keys.map((k, j) => <React.Fragment key={j}><span className="key">{k}</span>{j < s.keys.length-1 && '+'}</React.Fragment>)}
+                                    </div>
+                                    <div className="shortcut-desc">{s.desc}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            }
+        File: LiveTicker.tsx
+            Code:
+            // tradewall\src\components\LiveTicker.tsx
+            
+            import React, { useState, useEffect, useRef } from 'react';
+            import { supabase } from '../lib/supabaseClient'; 
+            
+            type Prices = {
+                [key: string]: number;
+            };
+            
+            interface LiveTickerProps {
+                prices: Prices;
+                onCoinClick: (coin: string) => void;
+                userId: string | null; 
+                refreshTrigger: number; // Added for refresh logic
+            }
+            
+            interface Alert {
+                id: string;
+                coin: string;
+                target_price: number; 
+                condition: 'above' | 'below';
+                note?: string; 
+                user_id?: string;
+            }
+            
+            const COINS = ['BTC', 'ETH', 'BNB', 'SOL'];
+            
+            // הגדרת צבעים לכל מטבע לזיהוי מהיר
+            const COIN_COLORS: { [key: string]: string } = {
+                BTC: '#F7931A', // כתום ביטקוין
+                ETH: '#627EEA', // סגול אתריום
+                BNB: '#F3BA2F', // צהוב ביננס
+                SOL: '#14F195'  // ירוק סולנה
+            };
+            
+            // --- קומפוננטת בחירה מותאמת אישית (פותרת את בעיית ה-Select ב-Wallpapers) ---
+            interface CustomSelectProps {
+                value: string;
+                options: { value: string; label: string }[];
+                onChange: (value: string) => void;
+            }
+            
+            const CustomDropdown = ({ value, options, onChange }: CustomSelectProps) => {
+                const [isOpen, setIsOpen] = useState(false);
+                const containerRef = useRef<HTMLDivElement>(null);
+            
+                // סגירת התפריט בלחיצה בחוץ
+                useEffect(() => {
+                    const handleClickOutside = (event: MouseEvent) => {
+                        if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+                            setIsOpen(false);
+                        }
+                    };
+                    document.addEventListener('mousedown', handleClickOutside);
+                    return () => document.removeEventListener('mousedown', handleClickOutside);
+                }, []);
+            
+                const selectedLabel = options.find(o => o.value === value)?.label || value;
+            
+                return (
+                    <div ref={containerRef} style={{ position: 'relative', flex: 1 }}>
+                        <div 
+                            className="glass-input"
+                            onClick={() => setIsOpen(!isOpen)}
+                            style={{
+                                padding: '10px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                fontSize: '0.9rem',
+                                userSelect: 'none'
+                            }}
+                        >
+                            <span>{selectedLabel}</span>
+                            <span style={{ fontSize: '0.7rem', opacity: 0.7, transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', transition: '0.2s' }}>▼</span>
+                        </div>
+                        {isOpen && (
+                            <div style={{
+                                position: 'absolute',
+                                top: 'calc(100% + 4px)',
+                                left: 0,
+                                width: '100%',
+                                background: '#1a1a2e', // רקע כהה
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                borderRadius: '12px',
+                                zIndex: 1000,
+                                boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
+                                overflow: 'hidden',
+                                maxHeight: '200px',
+                                overflowY: 'auto'
+                            }}>
+                                {options.map((option) => (
+                                    <div
+                                        key={option.value}
+                                        onClick={() => {
+                                            onChange(option.value);
+                                            setIsOpen(false);
+                                        }}
+                                        style={{
+                                            padding: '10px 12px',
+                                            cursor: 'pointer',
+                                            fontSize: '0.9rem',
+                                            borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                            background: value === option.value ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                            transition: 'background 0.2s',
+                                            color: 'white'
+                                        }}
+                                        onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
+                                        onMouseLeave={(e) => (e.currentTarget.style.background = value === option.value ? 'rgba(255,255,255,0.1)' : 'transparent')}
+                                    >
+                                        {option.label}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                );
+            };
+            
+            export default function LiveTicker({ prices, onCoinClick, userId, refreshTrigger }: LiveTickerProps) {
+                const [activeTab, setActiveTab] = useState<'market' | 'alerts'>('market');
+                
+                // ניהול התראות
+                const [alerts, setAlerts] = useState<Alert[]>([]);
+                
+                // טופס הוספת התראה
+                const [newAlertCoin, setNewAlertCoin] = useState('BTC');
+                const [newAlertPrice, setNewAlertPrice] = useState('');
+                const [newAlertCondition, setNewAlertCondition] = useState<'above' | 'below'>('above');
+                const [newAlertNote, setNewAlertNote] = useState(''); 
+            
+                // טעינת התראות מה-DB בעת טעינת הרכיב או שינוי משתמש
+                useEffect(() => {
+                    if (userId) {
+                        fetchAlerts();
+                    } else {
+                        // אם המשתמש התנתק, נקה את ההתראות מהתצוגה
+                        setAlerts([]);
+                    }
+                }, [userId, refreshTrigger]); // Added refreshTrigger
+            
+                const fetchAlerts = async () => {
+                    let query = supabase
+                        .from('alerts')
+                        .select('*')
+                        .order('created_at', { ascending: false });
+            
+                    // סינון לפי משתמש או נתונים ללא שיוך
+                    if (userId) {
+                        query = query.eq('user_id', userId);
+                    } else {
+                        // במצב תקין עם RLS, זה כנראה לא יחזיר כלום, אבל נשאיר למקרה קצה
+                        query = query.is('user_id', null);
+                    }
+            
+                    const { data, error } = await query;
+                    
+                    if (error) {
+                        console.error('Error fetching alerts:', error);
+                    } else if (data) {
+                        setAlerts(data as Alert[]);
+                    }
+                };
+            
+                // --- לוגיקת בדיקת מחירים והתראות ---
+                useEffect(() => {
+                    if (alerts.length === 0) return;
+            
+                    const triggeredAlertIds: string[] = [];
+            
+                    alerts.forEach(alert => {
+                        const currentPrice = prices[alert.coin];
+                        if (!currentPrice) return;
+            
+                        let triggered = false;
+                        if (alert.condition === 'above' && currentPrice >= alert.target_price) {
+                            triggered = true;
+                        } else if (alert.condition === 'below' && currentPrice <= alert.target_price) {
+                            triggered = true;
+                        }
+            
+                        if (triggered) {
+                            sendNotification(alert, currentPrice);
+                            triggeredAlertIds.push(alert.id);
+                        }
+                    });
+            
+                    if (triggeredAlertIds.length > 0) {
+                        removeTriggeredAlerts(triggeredAlertIds);
+                    }
+            
+                }, [prices, alerts]);
+            
+                const removeTriggeredAlerts = async (ids: string[]) => {
+                    setAlerts(prev => prev.filter(a => !ids.includes(a.id)));
+                    await supabase.from('alerts').delete().in('id', ids);
+                };
+            
+                const sendNotification = async (alert: Alert, currentPrice: number) => {
+                    const direction = alert.condition === 'above' ? 'עלה מעל' : 'ירד מתחת ל';
+                    
+                    let message = `${alert.coin} הגיע למחיר $${currentPrice}! (יעד: ${direction} $${alert.target_price})`;
+                    if (alert.note && alert.note.trim() !== '') {
+                        message += `\nהערה: ${alert.note}`;
+                    }
+                    
+                    try {
+                        await fetch('/api/pushover', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                title: 'TradeWall Alert 🚀',
+                                message: message 
+                            })
+                        });
+                        console.log('Notification sent:', message);
+                    } catch (err) {
+                        console.error('Failed to send notification', err);
+                    }
+                };
+            
+                const addAlert = async () => {
+                    if (!userId) {
+                        alert("עליך להתחבר כדי להוסיף התראות");
+                        return;
+                    }
+                    if (!newAlertPrice) return;
+                    const price = parseFloat(newAlertPrice);
+                    if (isNaN(price)) return;
+            
+                    const alertPayload: any = {
+                        coin: newAlertCoin,
+                        target_price: price,
+                        condition: newAlertCondition,
+                        note: newAlertNote,
+                        user_id: userId // שיוך למשתמש
+                    };
+            
+                    const { data, error } = await supabase
+                        .from('alerts')
+                        .insert([alertPayload])
+                        .select();
+            
+                    if (error) {
+                        // הצגת הודעת שגיאה מפורטת יותר
+                        alert('שגיאה בשמירת ההתראה: ' + error.message);
+                        console.error('Supabase Insert Error:', JSON.stringify(error, null, 2));
+                    } else if (data) {
+                        setAlerts(prev => [data[0] as Alert, ...prev]);
+                        setNewAlertPrice('');
+                        setNewAlertNote('');
+                    }
+                };
+            
+                const removeAlert = async (id: string) => {
+                    setAlerts(prev => prev.filter(a => a.id !== id));
+                    await supabase.from('alerts').delete().eq('id', id);
+                };
+            
+                return (
+                    <div className="glass-panel ticker-col" style={{display:'flex', flexDirection:'column', height:'100%', padding: '16px'}}>
+                        {/* כותרת וטאבים */}
+                        <div style={{display:'flex', justifyContent:'center', gap:10, marginBottom:15, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '10px'}}>
+                            <button 
+                                onClick={() => setActiveTab('market')}
+                                style={{
+                                    background: activeTab === 'market' ? 'rgba(255,255,255,0.2)' : 'transparent',
+                                    border: 'none', color:'white', padding:'6px 12px', borderRadius:8, cursor:'pointer', fontWeight:'bold', fontSize: '0.9rem'
+                                }}
+                            >
+                                שוק
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('alerts')}
+                                style={{
+                                    background: activeTab === 'alerts' ? 'rgba(255,255,255,0.2)' : 'transparent',
+                                    border: 'none', color:'white', padding:'6px 12px', borderRadius:8, cursor:'pointer', fontWeight:'bold', fontSize: '0.9rem'
+                                }}
+                            >
+                                התראות 🔔
+                            </button>
+                        </div>
+            
+                        {/* תוכן הטאבים - הוספתי כאן מרווח גלילה */}
+                        <div style={{flex:1, overflowY:'auto', paddingRight: '8px', paddingLeft: '8px'}}>
+                            
+                            {/* טאב שוק */}
+                            {activeTab === 'market' && (
+                                <div style={{display:'flex', flexDirection:'column', gap:16}}>
+                                    {COINS.map(coin => (
+                                        <div key={coin} className="coin-card" onClick={() => onCoinClick(coin)} style={{cursor: 'pointer'}}>
+                                            <div className="coin-info">
+                                                <h3>{coin}</h3>
+                                                <span>{coin === 'BTC' ? 'Bitcoin' : coin === 'ETH' ? 'Ethereum' : coin}</span>
+                                            </div>
+                                            <div className="coin-price">
+                                                <div className="price-val" style={{color: prices[coin] > 0 ? '#00ff88' : 'white'}}>
+                                                    {prices[coin] ? `$${prices[coin].toFixed(2)}` : 'Loading...'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+            
+                            {/* טאב התראות */}
+                            {activeTab === 'alerts' && (
+                                <div>
+                                    <div style={{background:'rgba(255,255,255,0.05)', padding:12, borderRadius:12, marginBottom:15, border: '1px solid rgba(255,255,255,0.1)'}}>
+                                        <h4 style={{marginBottom:10, textAlign:'center', fontSize: '0.95rem'}}>הוסף התראה לנייד</h4>
+                                        
+                                        <div style={{display:'flex', gap:10, marginBottom:8}}>
+                                            {/* שימוש ברכיב המותאם אישית במקום select רגיל */}
+                                            <CustomDropdown 
+                                                value={newAlertCoin}
+                                                options={COINS.map(c => ({ value: c, label: c }))}
+                                                onChange={(val) => setNewAlertCoin(val)}
+                                            />
+                                            
+                                            <CustomDropdown 
+                                                value={newAlertCondition}
+                                                options={[
+                                                    { value: 'above', label: 'מעל' },
+                                                    { value: 'below', label: 'מתחת' }
+                                                ]}
+                                                onChange={(val) => setNewAlertCondition(val as 'above' | 'below')}
+                                            />
+                                        </div>
+            
+                                        <input 
+                                            type="number" 
+                                            placeholder="מחיר יעד ($)" 
+                                            value={newAlertPrice}
+                                            onChange={(e) => setNewAlertPrice(e.target.value)}
+                                            className="glass-input"
+                                            style={{padding:12, marginBottom:8, fontSize:'0.9rem'}}
+                                        />
+            
+                                        {/* שדה הערה */}
+                                        <input 
+                                            type="text" 
+                                            placeholder="הערה (אופציונלי)" 
+                                            value={newAlertNote}
+                                            onChange={(e) => setNewAlertNote(e.target.value)}
+                                            className="glass-input"
+                                            style={{padding:12, marginBottom:10, fontSize:'0.9rem'}}
+                                        />
+            
+                                        <button 
+                                            onClick={addAlert}
+                                            className="btn-action"
+                                            style={{background:'#6c5ce7', marginTop:0, padding:8, fontSize: '0.9rem'}}
+                                        >
+                                            + צור ושמור
+                                        </button>
+                                    </div>
+            
+                                    <h4 style={{marginBottom:10, opacity:0.8, fontSize:'0.9rem'}}>התראות פעילות ({alerts.length})</h4>
+                                    <div style={{display:'flex', flexDirection:'column', gap:8}}>
+                                        {alerts.length === 0 && <div style={{textAlign:'center', opacity:0.5, fontSize:'0.8rem', padding: '20px'}}>אין התראות פעילות</div>}
+                                        
+                                        {alerts.map(alert => (
+                                            <div key={alert.id} style={{
+                                                background:'rgba(0,0,0,0.3)', 
+                                                padding:'10px 12px', 
+                                                borderRadius:8, 
+                                                // שימוש בצבע המטבע לגבול השמאלי
+                                                borderLeft: `4px solid ${COIN_COLORS[alert.coin] || '#888'}`,
+                                                display:'flex', flexDirection:'column', gap: 4,
+                                                borderTop: '1px solid rgba(255,255,255,0.05)',
+                                                borderRight: '1px solid rgba(255,255,255,0.05)',
+                                                borderBottom: '1px solid rgba(255,255,255,0.05)'
+                                            }}>
+                                                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', width: '100%'}}>
+                                                    <div style={{fontSize:'0.85rem'}}>
+                                                        <span style={{fontWeight:'bold'}}>{alert.coin}</span> 
+                                                        {/* שינוי מסימנים למילים ברורות */}
+                                                        <span style={{opacity: 0.9, color: alert.condition === 'above' ? '#00b894' : '#ff7675'}}>
+                                                            {' '}{alert.condition === 'above' ? 'מעל' : 'מתחת'} ${alert.target_price}
+                                                        </span>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => removeAlert(alert.id)}
+                                                        style={{background:'transparent', border:'none', color:'#ff7675', cursor:'pointer', fontSize:'1.2rem', padding: '0 5px'}}
+                                                        title="מחק התראה"
+                                                    >
+                                                        ×
+                                                    </button>
+                                                </div>
+                                                {alert.note && (
+                                                    <div style={{fontSize: '0.75rem', opacity: 0.6, fontStyle: 'italic'}}>
+                                                        "{alert.note}"
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
+        File: RiskCalculator.tsx
+            Code:
+            // tradewall\src\components\RiskCalculator.tsx
+            
+            import React, { useState, useEffect } from 'react';
+            
+            type Prices = {
+                [key: string]: number;
+            };
+            
+            interface RiskCalculatorProps {
+                prices: Prices;
+            }
+            
+            const COINS = ['BTC', 'ETH', 'BNB', 'SOL'];
+            
+            export default function RiskCalculator({ prices }: RiskCalculatorProps) {
+                // State פנימי למחשבון - מנותק מהדף הראשי
+                const [calcMode, setCalcMode] = useState<'long' | 'short'>('long');
+                const [selectedCoin, setSelectedCoin] = useState<string>('BTC');
+                const [inputs, setInputs] = useState({
+                    risk: 50,
+                    entry: '',
+                    tp: '',
+                    sl: ''
+                });
+            
+                // עדכון אוטומטי של מחיר הכניסה כשהמחיר משתנה (אם השדה ריק)
+                useEffect(() => {
+                    if (!inputs.entry && prices[selectedCoin] > 0) {
+                        setInputs(prev => ({ ...prev, entry: prices[selectedCoin].toString() }));
+                    }
+                }, [prices[selectedCoin], selectedCoin, inputs.entry]); 
+            
+                // לוגיקת החישוב
+                const runRiskCalc = () => {
+                    const entry = parseFloat(inputs.entry);
+                    const risk = inputs.risk;
+                    const slPrice = parseFloat(inputs.sl);
+                    const tpPrice = parseFloat(inputs.tp);
+            
+                    // חישוב בסיסי דורש כניסה, סיכון וסטופ
+                    if (!entry || !risk || !slPrice) return { posSize: 0, amount: 0, tpPercent: 0, slPercent: 0, expectedProfit: 0, expectedLoss: 0 };
+            
+                    const priceDiff = Math.abs(entry - slPrice);
+                    if (priceDiff === 0) return { posSize: 0, amount: 0, tpPercent: 0, slPercent: 0, expectedProfit: 0, expectedLoss: 0 };
+            
+                    const amount = risk / priceDiff;
+                    const posSize = amount * entry;
+            
+                    const tpPercent = tpPrice ? ((Math.abs(tpPrice - entry) / entry) * 100) : 0;
+                    const slPercent = ((Math.abs(slPrice - entry) / entry) * 100);
+            
+                    // חישוב רווח והפסד דולרי צפוי
+                    const expectedProfit = tpPrice ? (amount * Math.abs(tpPrice - entry)) : 0;
+                    // ההפסד הצפוי אמור להיות שווה לערך הסיכון שהוזן, אבל נחשב אותו כדי לוודא דיוק מתמטי
+                    const expectedLoss = amount * Math.abs(slPrice - entry); 
+            
+                    return { posSize, amount, tpPercent, slPercent, expectedProfit, expectedLoss };
+                };
+            
+                const results = runRiskCalc();
+            
+                return (
+                    <div className="tab-content active">
+                        <div className="calc-header">
+                            <h2>ניהול סיכונים</h2>
+                            <p>חשב גודל פוזיציה לפי הסיכון ומחיר סטופ</p>
+                        </div>
+            
+                        <div className="coin-select-row">
+                            {COINS.map(c => (
+                                <button key={c} 
+                                    className={`coin-btn ${selectedCoin === c ? 'active' : ''}`}
+                                    onClick={() => {
+                                        setSelectedCoin(c);
+                                        setInputs(prev => ({...prev, entry: prices[c].toString()}));
+                                    }}
+                                >
+                                    {c}
+                                </button>
+                            ))}
+                        </div>
+            
+                        <div className="mode-toggle">
+                            <button className={`mode-btn short ${calcMode === 'short' ? 'active' : ''}`} onClick={() => setCalcMode('short')}>SHORT 📉</button>
+                            <button className={`mode-btn long ${calcMode === 'long' ? 'active' : ''}`} onClick={() => setCalcMode('long')}>LONG 📈</button>
+                        </div>
+            
+                        <div style={{display:'flex', gap:15}}>
+                            <div className="input-group" style={{flex:1}}>
+                                <label>סיכון ($) מקסימלי</label>
+                                <input type="number" className="glass-input" value={inputs.risk} 
+                                    onChange={(e) => setInputs({...inputs, risk: parseFloat(e.target.value) || 0})} />
+                            </div>
+                            <div className="input-group" style={{flex:1}}>
+                                <label>מחיר כניסה ($)</label>
+                                <input type="number" className="glass-input" value={inputs.entry} 
+                                    onChange={(e) => setInputs({...inputs, entry: e.target.value})} />
+                            </div>
+                        </div>
+            
+                        <div style={{display:'flex', gap:15}}>
+                            <div className="input-group" style={{flex:1}}>
+                                <label>מחיר יעד (TP $)</label>
+                                <input type="number" className="glass-input" placeholder="מחיר יעד" value={inputs.tp}
+                                    onChange={(e) => setInputs({...inputs, tp: e.target.value})} />
+                            </div>
+                            <div className="input-group" style={{flex:1}}>
+                                <label>מחיר סטופ (SL $)</label>
+                                <input type="number" className="glass-input" placeholder="מחיר סטופ" value={inputs.sl}
+                                    onChange={(e) => setInputs({...inputs, sl: e.target.value})} />
+                            </div>
+                        </div>
+            
+                        <div className="calc-result-box">
+                            <div className="res-top">
+                                <div style={{textAlign:'right'}}>
+                                    <span className="res-label">גודל פוזיציה נדרש (Total):</span>
+                                    <div className="res-main-val">${results.posSize.toLocaleString(undefined, {maximumFractionDigits: 2})}</div>
+                                </div>
+                                <div style={{textAlign:'left'}}>
+                                    <span className="res-label">כמות מטבעות לקנייה:</span>
+                                    <div className="res-sub-val">{results.amount.toFixed(4)} {selectedCoin}</div>
+                                </div>
+                            </div>
+                            
+                            <div className="res-grid">
+                                <div className="res-item-small" style={{textAlign:'right'}}>
+                                    <span className="res-label">Target Price</span>
+                                    <div className="val" style={{color:'#00b894'}}>
+                                        {inputs.tp ? `$${parseFloat(inputs.tp).toFixed(2)}` : '-'}
+                                        {inputs.tp && <span style={{fontSize:'0.7em', opacity:0.7, marginRight: 5}}>({results.tpPercent.toFixed(2)}%)</span>}
+                                    </div>
+                                    {/* תצוגת רווח צפוי */}
+                                    {results.expectedProfit > 0 && (
+                                        <div style={{color: '#00b894', fontSize: '0.85em', marginTop: '4px', opacity: 0.9}}>
+                                            רווח צפוי: +${results.expectedProfit.toLocaleString(undefined, {maximumFractionDigits: 2})}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="res-item-small" style={{textAlign:'left'}}>
+                                    <span className="res-label">Stop Price</span>
+                                    <div className="val" style={{color:'#ff7675'}}>
+                                        {inputs.sl ? `$${parseFloat(inputs.sl).toFixed(2)}` : '-'}
+                                        {inputs.sl && <span style={{fontSize:'0.7em', opacity:0.7, marginRight: 5}}>({results.slPercent.toFixed(2)}%)</span>}
+                                    </div>
+                                    {/* תצוגת הפסד צפוי */}
+                                    {results.expectedLoss > 0 && (
+                                        <div style={{color: '#ff7675', fontSize: '0.85em', marginTop: '4px', opacity: 0.9}}>
+                                            הפסד צפוי: -${results.expectedLoss.toLocaleString(undefined, {maximumFractionDigits: 2})}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+    Folder: lib
+        File: supabaseClient.ts
+            Code:
+            // tradewall/src/lib/supabaseClient.ts
+            
+            import { createClient } from '@supabase/supabase-js'
+            
+            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+            const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+            
+            if (!supabaseUrl || !supabaseAnonKey) {
+              throw new Error('Missing Supabase environment variables')
+            }
+            
+            // שים לב ל-export כאן
+            export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+

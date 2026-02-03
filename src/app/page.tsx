@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import LiveTicker from '../components/LiveTicker';
+import LiveTicker, { TickerItem } from '../components/LiveTicker';
 import RiskCalculator from '../components/RiskCalculator';
 import KeyboardShortcuts from '../components/KeyboardShortcuts';
 import AuthModal from '../components/AuthModal';
@@ -19,12 +19,13 @@ type Prices = {
 };
 
 // --- Constants ---
-const COINS = ['BTC', 'ETH', 'BNB', 'SOL'];
 const SECRET_PIN = process.env.NEXT_PUBLIC_SECRET_PIN || "050488";
+const FINNHUB_API_KEY = process.env.NEXT_PUBLIC_FINNHUB_API_KEY || ""; 
 
 export default function TradeWall() {
     // --- State ---
-    const [prices, setPrices] = useState<Prices>({ BTC: 0, ETH: 0, BNB: 0, SOL: 0 });
+    const [tickers, setTickers] = useState<TickerItem[]>([]); 
+    const [prices, setPrices] = useState<Prices>({});
     const [activeTab, setActiveTab] = useState<string>('calc');
 
     // User / Auth State
@@ -32,7 +33,7 @@ export default function TradeWall() {
     const [showAuthModal, setShowAuthModal] = useState(false);
 
     // Portfolio Data
-    const [portfolio, setPortfolio] = useState<Portfolio>({ BTC: [], ETH: [], BNB: [], SOL: [] });
+    const [portfolio, setPortfolio] = useState<Portfolio>({});
     const [isLoadingData, setIsLoadingData] = useState(true);
 
     // Alerts Refresh Trigger
@@ -43,7 +44,6 @@ export default function TradeWall() {
     const [lockPin, setLockPin] = useState('');
 
     // --- Modal Configuration State ---
-    // שינינו את ה-state הזה להיות פשוט יותר, רק מחזיק את המידע על *מה* פותחים
     const [modalConfig, setModalConfig] = useState<{
         isOpen: boolean;
         mode: 'add' | 'edit';
@@ -75,9 +75,41 @@ export default function TradeWall() {
         }
     };
 
+    // --- Fetch Logic (Reused) ---
+
+    // פונקציה לשליפת טיקרים - מוגדרת כאן כדי שנוכל להעביר אותה ל-LiveTicker
+    const fetchTickers = async () => {
+        if (!user) {
+            setTickers([]);
+            return;
+        }
+
+        const { data, error } = await supabase
+            .from('tickers')
+            .select('*')
+            .eq('is_active', true)
+            .eq('user_id', user.id)
+            .order('symbol', { ascending: true });
+        
+        if (data) {
+            setTickers(data as TickerItem[]);
+            
+            // אתחול מחירים התחלתיים ל-0 עבור טיקרים חדשים (תוך שמירה על מחירים קיימים)
+            setPrices(prev => {
+                const newPrices = { ...prev };
+                data.forEach((t: any) => {
+                    if (newPrices[t.symbol] === undefined) {
+                        newPrices[t.symbol] = 0;
+                    }
+                });
+                return newPrices;
+            });
+        }
+    };
+
     // --- Effects ---
 
-    // 1. Check User Session on Mount
+    // 1. Check User Session on Mount & Listen for Auth Changes
     useEffect(() => {
         const getUser = async () => {
             const { data: { session } } = await supabase.auth.getSession();
@@ -93,7 +125,8 @@ export default function TradeWall() {
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setUser(session?.user || null);
             if (!session) {
-                setPortfolio({ BTC: [], ETH: [], BNB: [], SOL: [] });
+                setPortfolio({});
+                setTickers([]); 
             } else {
                 fetchPortfolio(session.user.id);
             }
@@ -102,7 +135,12 @@ export default function TradeWall() {
         return () => subscription.unsubscribe();
     }, []);
 
-    // 2. Initial Load & WebSocket & Restore Lock State
+    // 2. Fetch Tickers when user changes
+    useEffect(() => {
+        fetchTickers();
+    }, [user]);
+
+    // 3. WebSocket (Crypto) & Stock API Integration
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const savedLockState = localStorage.getItem('tradeWall_isLocked');
@@ -111,41 +149,104 @@ export default function TradeWall() {
             }
         }
 
-        // --- WebSocket Logic ---
         let ws: WebSocket | null = null;
         let reconnectTimer: NodeJS.Timeout | null = null;
+        let stockInterval: NodeJS.Timeout | null = null;
 
+        // --- פונקציה לחיבור וובסוקט קריפטו (ביננס) ---
         const connectWebSocket = () => {
+            const cryptoSymbols = tickers.filter(t => t.type === 'crypto').map(t => t.symbol.toLowerCase() + 'usdt');
+            
+            if (cryptoSymbols.length === 0) return;
+
+            // שימוש ב-Combined Streams
+            const streams = cryptoSymbols.map(s => `${s}@miniTicker`).join('/');
+            const url = `wss://stream.binance.com:9443/stream?streams=${streams}`;
+
             if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
                 return;
             }
 
             console.log('Connecting to Binance WebSocket...');
-            ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@miniTicker/ethusdt@miniTicker/bnbusdt@miniTicker/solusdt@miniTicker');
+            
+            try {
+                ws = new WebSocket(url);
 
-            ws.onopen = () => {
-                console.log('WebSocket Connected');
-            };
+                ws.onopen = () => {
+                    console.log('WebSocket Connected');
+                };
 
-            ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                const symbol = data.s.replace('USDT', '');
-                const price = parseFloat(data.c);
-                setPrices(prev => ({ ...prev, [symbol]: price }));
-            };
+                ws.onmessage = (event) => {
+                    try {
+                        const message = JSON.parse(event.data);
+                        // ב-Combined Stream, המידע נמצא תחת המפתח 'data'
+                        const data = message.data || message; 
 
-            ws.onclose = () => {
-                console.log('WebSocket Closed. Reconnecting in 3s...');
-                reconnectTimer = setTimeout(connectWebSocket, 3000);
-            };
+                        if (data && data.s && data.c) {
+                            const symbol = data.s.replace('USDT', '');
+                            const price = parseFloat(data.c);
+                            setPrices(prev => ({ ...prev, [symbol]: price }));
+                        }
+                    } catch (e) {
+                        // התעלמות משגיאות פרסור בודדות
+                    }
+                };
 
-            ws.onerror = (err) => {
-                console.error('WebSocket Error:', err);
-                ws?.close();
-            };
+                ws.onclose = () => {
+                    console.log('WebSocket Closed. Reconnecting in 3s...');
+                    reconnectTimer = setTimeout(connectWebSocket, 3000);
+                };
+
+                ws.onerror = (err) => {
+                    console.warn('WebSocket Connection Error (Retrying...)');
+                    ws?.close();
+                };
+            } catch (e) {
+                console.error("Failed to create WebSocket:", e);
+            }
         };
 
-        connectWebSocket();
+        // --- פונקציה למשיכת מחירי מניות (Finnhub API) ---
+        const fetchStockPrices = async () => {
+            const stocks = tickers.filter(t => t.type === 'stock');
+            if (stocks.length === 0) return;
+
+            if (!FINNHUB_API_KEY) {
+                console.warn("Missing Finnhub API Key");
+                return;
+            }
+
+            const promises = stocks.map(async (stock) => {
+                try {
+                    const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${stock.symbol}&token=${FINNHUB_API_KEY}`);
+                    if (!res.ok) return null;
+                    const data = await res.json();
+                    return { symbol: stock.symbol, price: data.c }; 
+                } catch (error) {
+                    console.error(`Error fetching ${stock.symbol}:`, error);
+                    return null;
+                }
+            });
+
+            const results = await Promise.all(promises);
+            
+            const newStockPrices: Prices = {};
+            results.forEach(item => {
+                if (item && item.price) {
+                    newStockPrices[item.symbol] = parseFloat(item.price);
+                }
+            });
+            
+            if (Object.keys(newStockPrices).length > 0) {
+                setPrices(prev => ({ ...prev, ...newStockPrices }));
+            }
+        };
+
+        if (tickers.length > 0) {
+            connectWebSocket();
+            fetchStockPrices();
+            stockInterval = setInterval(fetchStockPrices, 15000); 
+        }
 
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
@@ -162,8 +263,9 @@ export default function TradeWall() {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             if (reconnectTimer) clearTimeout(reconnectTimer);
             if (ws) ws.close();
+            if (stockInterval) clearInterval(stockInterval);
         };
-    }, []); 
+    }, [tickers]); 
 
     // --- Helpers & Supabase Logic ---
 
@@ -190,21 +292,22 @@ export default function TradeWall() {
         }
 
         if (data) {
-            const newPortfolio: Portfolio = { BTC: [], ETH: [], BNB: [], SOL: [] };
+            const newPortfolio: Portfolio = {};
+            tickers.forEach(t => newPortfolio[t.symbol] = []);
 
             const spots = data.filter(item => item.parent_id === null);
             spots.forEach(spot => {
-                if (newPortfolio[spot.symbol]) {
-                    newPortfolio[spot.symbol].push({
-                        ...spot, 
-                        entry: Number(spot.entry),
-                        amount: Number(spot.amount),
-                        tp: Number(spot.tp),
-                        sl: Number(spot.sl),
-                        risk: Number(spot.risk),
-                        shorts: []
-                    });
-                }
+                if (!newPortfolio[spot.symbol]) newPortfolio[spot.symbol] = [];
+                
+                newPortfolio[spot.symbol].push({
+                    ...spot, 
+                    entry: Number(spot.entry),
+                    amount: Number(spot.amount),
+                    tp: Number(spot.tp),
+                    sl: Number(spot.sl),
+                    risk: Number(spot.risk),
+                    shorts: []
+                });
             });
 
             const shorts = data.filter(item => item.parent_id !== null);
@@ -230,6 +333,12 @@ export default function TradeWall() {
         }
         setIsLoadingData(false);
     };
+
+    // עדכון הפורטפוליו כאשר הטיקרים משתנים
+    useEffect(() => {
+        if (user) fetchPortfolio(user.id);
+    }, [tickers]);
+
 
     // --- Helpers for Modal ---
 
@@ -264,13 +373,11 @@ export default function TradeWall() {
             if (error) throw error;
 
             if (type === 'spot') {
-                // במחיקת ספוט - מוחקים את כל ההתראות של המטבע למשתמש זה
                 await supabase.from('alerts').delete()
                     .eq('coin', coin)
                     .eq('user_id', user.id);
                 setRefreshTrigger(prev => prev + 1);
             } else {
-                // --- Logic Update: Delete alerts for THIS hedge AND the NEXT hedge entry alert ---
                 const currentHedgeNum = (shortIndex ?? 0) + 1;
                 const nextHedgeNum = currentHedgeNum + 1;
 
@@ -280,14 +387,8 @@ export default function TradeWall() {
                     const idsToDelete = alerts
                         .filter(a => {
                             if (!a.note) return false;
-                            
-                            // 1. Delete alerts related to THIS hedge (e.g., "Hedge 2 ... TP", "Hedge 2 ... SL")
                             const relatedToCurrent = a.note.includes(`Hedge ${currentHedgeNum}`);
-                            
-                            // 2. Delete the Entry Alert for the NEXT hedge (e.g., "⚠️ ENTER HEDGE 3 NOW!")
-                            //    This alert was created by the hedge we are currently deleting.
                             const relatedToNextEntry = a.note.includes(`ENTER HEDGE ${nextHedgeNum}`);
-                            
                             return relatedToCurrent || relatedToNextEntry;
                         })
                         .map(a => a.id);
@@ -305,6 +406,34 @@ export default function TradeWall() {
         } catch (err: any) {
             alert("שגיאה במחיקה: " + err.message);
         }
+    };
+
+    // --- Renderers ---
+
+    const renderCategoryHub = (type: 'crypto' | 'stock') => {
+        const items = tickers.filter(t => t.type === type);
+        return (
+            <div className="tab-content active" style={{ direction: 'rtl' }}>
+                <div className="calc-header">
+                    <h2>{type === 'crypto' ? 'פורטפוליו קריפטו' : 'פורטפוליו מניות'}</h2>
+                    <p>בחר נכס לצפייה וניהול פוזיציות</p>
+                </div>
+                <div className="shortcuts-grid">
+                    {items.map(t => (
+                        <div key={t.symbol} className="shortcut-card" onClick={() => setActiveTab(t.symbol)} style={{cursor: 'pointer', justifyContent: 'center', flexDirection: 'column', gap: 5}}>
+                            <h3 style={{fontSize: '1.2rem', fontWeight: 'bold'}}>{t.symbol}</h3>
+                            <span style={{opacity: 0.7}}>{t.name}</span>
+                            <span style={{
+                                color: (prices[t.symbol] || 0) > 0 ? '#00ff88' : 'white', 
+                                fontSize: '1.1rem', fontWeight: 'bold', fontFamily: 'monospace'
+                            }}>
+                                ${prices[t.symbol]?.toLocaleString(undefined, {minimumFractionDigits: 2}) || 'Loading...'}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
     };
 
     const renderPortfolio = () => {
@@ -326,13 +455,30 @@ export default function TradeWall() {
 
         if (isLoadingData) return <div style={{ textAlign: 'center', padding: 40, opacity: 0.8 }}>טוען נתונים...</div>;
         if (!user && strategies.length === 0) return <div style={{ textAlign: 'center', padding: 40, opacity: 0.8 }}><p style={{fontSize:'1.1rem', marginBottom:15}}>נא להתחבר כדי לנהל פוזיציות</p><button className="btn-action" style={{background:'#6c5ce7', color:'white', width:150}} onClick={() => setShowAuthModal(true)}>התחברות</button></div>;
-        if (strategies.length === 0) return <div style={{ textAlign: 'center', padding: 40, opacity: 0.5 }}><p style={{ fontSize: '1.2rem', marginBottom: 10 }}>הפורטפוליו ריק</p><button className="btn-action btn-add-spot" style={{ width: 200 }} onClick={() => openModal('add', activeTab)}>+ פתח פוזיציית ספוט</button></div>;
+        
+        if (strategies.length === 0) return (
+            <div style={{ textAlign: 'center', padding: 40, opacity: 0.5 }}>
+                <h2 style={{marginBottom: 10}}>{activeTab}</h2>
+                <p style={{ fontSize: '1.2rem', marginBottom: 20 }}>אין פוזיציות פתוחות</p>
+                <button className="btn-action btn-add-spot" style={{ width: 200 }} onClick={() => openModal('add', activeTab)}>+ פתח פוזיציית ספוט</button>
+            </div>
+        );
 
         return (
             <div className="tab-content active" style={{ direction: 'rtl', paddingLeft: '12px' }}>
                 <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <button className="icon-btn" onClick={() => updateLockState(true)} title="נעל מסך">🔒</button>
-                    <button className="btn-action btn-add-spot" style={{ width: 'auto', padding: '8px 20px' }} onClick={() => openModal('add', activeTab)}>+ הוסף ספוט חדש</button>
+                    <div style={{display:'flex', gap: 10, alignItems:'center'}}>
+                         <button onClick={() => {
+                             const type = tickers.find(t => t.symbol === activeTab)?.type;
+                             setActiveTab(type === 'stock' ? 'stock_hub' : 'crypto_hub');
+                         }} style={{background:'transparent', border:'none', color:'white', fontSize:'1.2rem', cursor:'pointer'}}>➜</button>
+                         <h2 style={{margin:0}}>{activeTab}</h2>
+                    </div>
+                    
+                    <div style={{display:'flex', gap: 10}}>
+                        <button className="icon-btn" onClick={() => updateLockState(true)} title="נעל מסך">🔒</button>
+                        <button className="btn-action btn-add-spot" style={{ width: 'auto', padding: '8px 20px' }} onClick={() => openModal('add', activeTab)}>+ הוסף ספוט</button>
+                    </div>
                 </div>
 
                 {strategies.map((spot, idx) => {
@@ -346,6 +492,8 @@ export default function TradeWall() {
                     let projectedShortWinAtSL = 0;
 
                     spot.shorts.forEach(s => {
+                        const shortPnL = (s.entry - currentPrice) * s.amount;
+                        totalShortPnL += shortPnL;
                         if (spot.tp) projectedShortLossAtTP += (s.entry - spot.tp) * s.amount;
                         if (spot.sl) projectedShortWinAtSL += (s.entry - spot.sl) * s.amount;
                     });
@@ -374,12 +522,10 @@ export default function TradeWall() {
                                 <span>כמות: {spot.amount}</span>
                                 <span>סטופ: <span style={{ color: '#ff7675' }}>{spot.sl ? `$${spot.sl}` : '-'}</span></span>
                             </div>
-                            {/* --- שורת השקעה וסיכון --- */}
-                            <div className="data-row">
+                             <div className="data-row">
                                 <span>השקעה: ${spotCost.toFixed(2)}</span>
                                 <span>סיכון: {spot.risk ? `$${spot.risk}` : '-'}</span>
                             </div>
-                            {/* ---------------------------------- */}
                             <div className="data-row">
                                 <span>PNL ספוט:</span>
                                 <span className={spotPnL >= 0 ? 'val-profit' : 'val-loss'}>{spotPnL >= 0 ? '+' : ''}${spotPnL.toFixed(2)}</span>
@@ -387,7 +533,6 @@ export default function TradeWall() {
 
                             {spot.shorts.map((short, sIdx) => {
                                 const shortPnL = (short.entry - currentPrice) * short.amount;
-                                totalShortPnL += shortPnL;
                                 return (
                                     <div key={sIdx} className="sub-card">
                                         <div className="strategy-header" style={{ marginBottom: 8, border: 'none', padding: 0 }}>
@@ -460,6 +605,8 @@ export default function TradeWall() {
                     onCoinClick={(coin) => { setActiveTab(coin); }}
                     userId={user?.id || null}
                     refreshTrigger={refreshTrigger}
+                    tickers={tickers}
+                    onTickerUpdate={fetchTickers}
                 />
                 <div className="glass-panel calc-col">
                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:15}}>
@@ -478,14 +625,27 @@ export default function TradeWall() {
                     <div className="tabs-container">
                         <button className={`tab-btn ${activeTab === 'calc' ? 'active' : ''}`} onClick={() => setActiveTab('calc')}>מחשבון</button>
                         <button className={`tab-btn ${activeTab === 'shortcuts' ? 'active' : ''}`} onClick={() => setActiveTab('shortcuts')}>קיצורים</button>
-                        {COINS.map(c => (
-                            <button key={c} className={`tab-btn ${activeTab === c ? 'active' : ''}`} onClick={() => setActiveTab(c)}>{c}</button>
-                        ))}
+                        
+                        {/* כפתור קריפטו - מציג את כל מטבעות הקריפטו */}
+                        <button className={`tab-btn ${activeTab === 'crypto_hub' || tickers.find(t => t.symbol === activeTab && t.type === 'crypto') ? 'active' : ''}`} 
+                                onClick={() => setActiveTab('crypto_hub')}>
+                            קריפטו
+                        </button>
+                        
+                        {/* כפתור מניות */}
+                        <button className={`tab-btn ${activeTab === 'stock_hub' || tickers.find(t => t.symbol === activeTab && t.type === 'stock') ? 'active' : ''}`} 
+                                onClick={() => setActiveTab('stock_hub')}>
+                            מניות
+                        </button>
                     </div>
 
                     {activeTab === 'calc' && <RiskCalculator prices={prices} />}
                     {activeTab === 'shortcuts' && <KeyboardShortcuts />}
-                    {COINS.includes(activeTab) && renderPortfolio()}
+                    
+                    {activeTab === 'crypto_hub' && renderCategoryHub('crypto')}
+                    {activeTab === 'stock_hub' && renderCategoryHub('stock')}
+                    
+                    {tickers.find(t => t.symbol === activeTab) && renderPortfolio()}
                 </div>
             </div>
 
@@ -500,12 +660,12 @@ export default function TradeWall() {
                 currentPrice={prices[modalConfig.coin]}
                 user={user}
                 // שליפת אובייקט הספוט האב, אם קיים אינדקס
-                parentSpot={(modalConfig.coin && modalConfig.parentIdx !== null) 
+                parentSpot={(modalConfig.coin && modalConfig.parentIdx !== null && portfolio[modalConfig.coin]) 
                     ? portfolio[modalConfig.coin][modalConfig.parentIdx] 
                     : null
                 }
                 // שליפת אובייקט הגידור הבן, אם קיים אינדקס
-                childHedge={(modalConfig.coin && modalConfig.parentIdx !== null && modalConfig.childIdx !== null)
+                childHedge={(modalConfig.coin && modalConfig.parentIdx !== null && modalConfig.childIdx !== null && portfolio[modalConfig.coin])
                     ? portfolio[modalConfig.coin][modalConfig.parentIdx].shorts[modalConfig.childIdx]
                     : null
                 }

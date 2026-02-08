@@ -1,12 +1,9 @@
 // tradewall\src\components\PositionModal.tsx
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { calculateHedgeStrategy, HedgeSetup } from '../app/utils/hedgeLogic';
 
 // --- Types (Shared) ---
-// שכפול ה-Interface כדי לא ליצור תלות בקובץ חיצוני אם לא קיים, 
-// במידה ויש קובץ types.ts עדיף לייבא משם.
 export interface Position {
     id: string;
     entry: number;
@@ -21,7 +18,7 @@ export interface Position {
     user_id?: string;
     strategy_hedges_count?: number;
     strategy_risk_percent?: number;
-    symbol: string; // Added symbol to interface for easier access
+    symbol: string;
     parent_id?: string | null;
 }
 
@@ -32,15 +29,9 @@ interface PositionModalProps {
     coin: string;
     currentPrice: number;
     user: any;
-    
-    // אם אנחנו עורכים או מוסיפים גידור לספוט קיים - נעביר אותו כאן
     parentSpot: Position | null;
-    
-    // אם אנחנו עורכים גידור ספציפי - נעביר את האובייקט שלו (או האינדקס)
-    // לצורך פשטות נעביר את האובייקט והאינדקס לחישובים
     childHedge: Position | null;
-    childHedgeIndex: number | null; // 0 for Hedge 1, 1 for Hedge 2...
-
+    childHedgeIndex: number | null;
     onSuccess: (refreshAlerts: boolean) => void;
 }
 
@@ -119,7 +110,6 @@ export default function PositionModal({
         if (mode === 'add') {
             if (parentSpot) {
                 // הוספת גידור (Hedge)
-                // אם לספוט יש TP, הוא הופך ל-SL של הגידור (לוגיקה נפוצה בגידורים)
                 if (parentSpot.tp) {
                     initialData.sl = parentSpot.tp.toString();
                 }
@@ -153,8 +143,6 @@ export default function PositionModal({
                         strategyState.calculatedSetups = setups;
                     }
                 }
-            } else {
-                // הוספת ספוט חדש - המחיר הנוכחי כבר הוזן ב-initialData
             }
         } 
         // מצב עריכה
@@ -219,8 +207,29 @@ export default function PositionModal({
     const handleInput = (field: string, value: string) => {
         const newData = { ...data, [field]: value };
         
-        // --- Risk Calculation Logic ---
-        // 1. If Risk changed -> Update Amount
+        // --- 1. Hedge Strategy Logic (Priority) ---
+        if (strategy.isActive && parentSpot && mode === 'add' && (field === 'entry' || field === 'sl')) {
+            const newEntry = field === 'entry' ? parseFloat(value) : parseFloat(newData.entry);
+            const newSL = field === 'sl' ? parseFloat(value) : parseFloat(newData.sl);
+            
+            const targetRisk = parseFloat(data.risk);
+
+            if (!isNaN(newEntry) && !isNaN(newSL) && !isNaN(targetRisk) && newEntry !== newSL) {
+                const diff = Math.abs(newEntry - newSL);
+                const newAmount = targetRisk / diff;
+                
+                // הנוסחה: TP = 2 * Entry - SL (יחס 1:1)
+                const newTP = (2 * newEntry) - newSL;
+
+                newData.amount = newAmount.toFixed(6);
+                newData.tp = newTP.toFixed(4);
+            }
+            
+            setData(newData);
+            return;
+        }
+
+        // --- 2. Standard Risk Calculation Logic ---
         if (field === 'risk') {
              const riskVal = parseFloat(value);
              const entryVal = parseFloat(newData.entry);
@@ -232,54 +241,24 @@ export default function PositionModal({
                  newData.amount = newAmount.toFixed(6);
              }
         }
-        // 2. If Amount/Entry/SL changed -> Update Risk
         else if (field === 'amount' || field === 'entry' || field === 'sl') {
             const entryVal = parseFloat(newData.entry);
             const slVal = parseFloat(newData.sl);
             const amountVal = parseFloat(newData.amount);
+            const riskVal = parseFloat(data.risk);
 
-            if (!isNaN(amountVal) && !isNaN(entryVal) && !isNaN(slVal)) {
+            if (field !== 'amount' && (isNaN(amountVal) || amountVal === 0) && !isNaN(riskVal) && riskVal > 0 && !isNaN(entryVal) && !isNaN(slVal) && entryVal !== slVal) {
+                 const diff = Math.abs(entryVal - slVal);
+                 const newAmount = riskVal / diff;
+                 newData.amount = newAmount.toFixed(6);
+            } 
+            else if (!isNaN(amountVal) && !isNaN(entryVal) && !isNaN(slVal)) {
                  const diff = Math.abs(entryVal - slVal);
                  const newRisk = diff * amountVal;
                  newData.risk = newRisk.toFixed(2);
             }
         }
         
-        // Dynamic Strategy Recalculation (if adding hedge and strategy active)
-        if (strategy.isActive && parentSpot && mode === 'add' && (field === 'entry' || field === 'sl')) {
-            const newEntry = field === 'entry' ? parseFloat(value) : parseFloat(data.entry);
-            const newSL = field === 'sl' ? parseFloat(value) : parseFloat(data.sl);
-
-            if (!isNaN(newEntry) && !isNaN(newSL)) {
-                const newSetups = calculateHedgeStrategy(
-                    parentSpot.entry,
-                    newSL,
-                    parentSpot.amount,
-                    strategy.riskPercent,
-                    strategy.hedgesCount,
-                    newEntry
-                );
-
-                const currentSetupIdx = strategy.currentHedgeIndex - 1;
-                const updatedSetup = newSetups[currentSetupIdx];
-
-                if (updatedSetup) {
-                    newData.amount = updatedSetup.coinAmount.toString();
-                    newData.risk = updatedSetup.riskAmount.toString();
-                    newData.tp = updatedSetup.tp.toString();
-                }
-
-                setStrategy(prev => ({
-                    ...prev,
-                    calculatedSetups: newSetups
-                }));
-                
-                // עדכון ה-state עם הערכים החדשים שחושבו
-                setData(newData);
-                return;
-            }
-        }
-
         setData(newData);
     };
 
@@ -287,11 +266,9 @@ export default function PositionModal({
         if (!parentSpot) return;
         
         const currentFormEntry = parseFloat(data.entry);
-        // אם המשתמש הזין מחיר כניסה, נשתמש בו כבסיס, אחרת נשתמש במחיר הכניסה של הספוט (או מחיר נוכחי)
         const startPrice = !isNaN(currentFormEntry) ? currentFormEntry : parentSpot.entry;
         
         const currentFormSL = parseFloat(data.sl);
-        // אם המשתמש הזין סטופ, נשתמש בו, אחרת נשתמש ב-TP של הספוט (שהוא הסטופ של הגידור בד"כ)
         const targetSL = !isNaN(currentFormSL) ? currentFormSL : parentSpot.tp;
 
         const setups = calculateHedgeStrategy(
@@ -399,37 +376,70 @@ export default function PositionModal({
                 }
             }
 
+            // --- ALERT CREATION LOGIC ---
+            
+            // פונקציית עזר לבדיקה האם ההתראה כבר "שרופה" (המחיר כבר עבר את היעד)
+            const shouldCreateAlert = (target: number, condition: 'above' | 'below') => {
+                // אם אין מחיר נוכחי, ניצור את ההתראה ליתר ביטחון
+                if (!currentPrice || currentPrice === 0) return true;
+                
+                // אם התנאי הוא 'above' (למשל SL של שורט) והמחיר כבר מעל - לא ניצור
+                if (condition === 'above' && currentPrice >= target) return false;
+                
+                // אם התנאי הוא 'below' (למשל TP של שורט) והמחיר כבר מתחת - לא ניצור
+                if (condition === 'below' && currentPrice <= target) return false;
+                
+                return true;
+            };
+
             // יצירת התראות אם המשתמש סימן
             if (createAlerts && savedRecord) {
                 const alertsToCreate = [];
 
                 if (!parentSpot) {
-                    // התראות לספוט
-                    if (tpVal > 0) alertsToCreate.push({ coin, target_price: tpVal, condition: 'above', note: `Spot ${coin} TP Hit - Close All`, user_id: user.id });
-                    if (slVal > 0) alertsToCreate.push({ coin, target_price: slVal, condition: 'below', note: `Spot ${coin} SL Hit`, user_id: user.id });
+                    // Spot Alerts (LONG)
+                    // TP (Above)
+                    if (tpVal > 0 && shouldCreateAlert(tpVal, 'above')) {
+                        alertsToCreate.push({ coin, target_price: tpVal, condition: 'above', note: `Spot ${coin} TP Hit - Close All`, user_id: user.id });
+                    }
+                    // SL (Below)
+                    if (slVal > 0 && shouldCreateAlert(slVal, 'below')) {
+                        alertsToCreate.push({ coin, target_price: slVal, condition: 'below', note: `Spot ${coin} SL Hit`, user_id: user.id });
+                    }
                 } else {
-                    // התראות לגידור
-                    if (tpVal > 0) alertsToCreate.push({ 
-                        coin, target_price: tpVal, condition: 'below', 
-                        note: `Hedge ${strategy.currentHedgeIndex} (${coin}) TP`, user_id: user.id 
-                    });
-                    if (slVal > 0) alertsToCreate.push({ 
-                        coin, target_price: slVal, condition: 'above', 
-                        note: `Hedge ${strategy.currentHedgeIndex} (${coin}) SL`, user_id: user.id 
-                    });
+                    // Hedge Alerts (SHORT)
+                    // TP (Below)
+                    if (tpVal > 0 && shouldCreateAlert(tpVal, 'below')) {
+                        alertsToCreate.push({ 
+                            coin, target_price: tpVal, condition: 'below', 
+                            note: `Hedge ${strategy.currentHedgeIndex} (${coin}) TP`, user_id: user.id 
+                        });
+                    }
+                    // SL (Above)
+                    if (slVal > 0 && shouldCreateAlert(slVal, 'above')) {
+                        alertsToCreate.push({ 
+                            coin, target_price: slVal, condition: 'above', 
+                            note: `Hedge ${strategy.currentHedgeIndex} (${coin}) SL`, user_id: user.id 
+                        });
+                    }
 
                     // התראה לכניסה לגידור הבא (אם חושב באסטרטגיה)
                     if (strategy.calculatedSetups && strategy.calculatedSetups.length > 0) {
                         const nextSetup = strategy.calculatedSetups.find(s => s.index === strategy.currentHedgeIndex + 1);
                         
                         if (nextSetup) {
-                            alertsToCreate.push({
-                                coin: coin,
-                                target_price: nextSetup.entry,
-                                condition: 'above',
-                                note: `⚠️ ENTER HEDGE ${nextSetup.index} NOW! ($${nextSetup.entry})`,
-                                user_id: user.id
-                            });
+                            // קביעת הכיוון: אם הגידור הבא נמוך מהנוכחי (שורט קלאסי) -> below
+                            const alertCondition = nextSetup.entry < entry ? 'below' : 'above';
+
+                            if (shouldCreateAlert(nextSetup.entry, alertCondition)) {
+                                alertsToCreate.push({
+                                    coin: coin,
+                                    target_price: nextSetup.entry,
+                                    condition: alertCondition,
+                                    note: `⚠️ ENTER HEDGE ${nextSetup.index} @ $${nextSetup.entry} | Amt: ${nextSetup.coinAmount} | Inv: $${nextSetup.investAmount} | TP: ${nextSetup.tp} | SL: ${nextSetup.sl}`,
+                                    user_id: user.id
+                                });
+                            }
                         }
                     }
                 }
@@ -469,7 +479,7 @@ export default function PositionModal({
                     <div style={{marginBottom: 20, padding: 10, background: 'rgba(255,255,255,0.05)', borderRadius: 10}}>
                         <div style={{fontSize:'0.85rem', marginBottom: 8, textAlign:'center'}}>בחר אסטרטגיה (תחול על כל הגידורים):</div>
                         <div style={{display:'flex', justifyContent:'center', gap:5, marginBottom:10}}>
-                            {[2,3,4].map(num => (
+                            {[1, 2, 3, 4].map(num => (
                                 <button 
                                     key={num}
                                     onClick={() => setStrategy(prev => ({...prev, hedgesCount: num}))}
@@ -478,7 +488,7 @@ export default function PositionModal({
                                         border: 'none', borderRadius: 4, padding: '4px 10px', color: 'white', cursor:'pointer', fontSize: '0.8rem'
                                     }}
                                 >
-                                    {num} גידורים
+                                    {num} {num === 1 ? 'גידור' : 'גידורים'}
                                 </button>
                             ))}
                         </div>

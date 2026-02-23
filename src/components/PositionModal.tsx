@@ -120,12 +120,24 @@ export default function PositionModal({
 
                 // בדיקה אם קיימת אסטרטגיה מוגדרת מראש בספוט
                 if (parentSpot.strategy_risk_percent && parentSpot.strategy_hedges_count) {
+                    
+                    // --- תיקון: קביעת נקודת ההתחלה של האסטרטגיה ---
+                    // אם כבר קיימים גידורים (למשל פותחים את גידור 2), אנו רוצים שהחישוב יתבסס 
+                    // על מחיר הכניסה בפועל של הגידור הראשון, ולא על מחיר הספוט המקורי.
+                    // זה מבטיח עקביות עם ההתראות שנוצרו.
+                    let startPrice = parentSpot.entry;
+                    if (parentSpot.shorts && parentSpot.shorts.length > 0) {
+                        // לוקחים את הכניסה של הגידור הראשון כעוגן לחישוב הרשת
+                        startPrice = parentSpot.shorts[0].entry;
+                    }
+
                     const setups = calculateHedgeStrategy(
                         parentSpot.entry,
                         parentSpot.tp,
                         parentSpot.amount,
                         parentSpot.strategy_risk_percent,
-                        parentSpot.strategy_hedges_count
+                        parentSpot.strategy_hedges_count,
+                        startPrice // מעבירים את מחיר ההתחלה המעודכן
                     );
                     
                     const setupToApply = setups[parentSpot.shorts?.length || 0];

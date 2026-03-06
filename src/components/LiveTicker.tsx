@@ -281,7 +281,17 @@ export default function LiveTicker({ prices, onCoinClick, userId, refreshTrigger
         if (alert.note) message += `\nהערה: ${alert.note}`;
         
         try {
+            // --- התראות Pushover מושהות זמנית ---
+            /*
             await fetch('/api/pushover', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: 'TradeWall Alert 🚀', message })
+            });
+            */
+
+            // --- שליחת התראה לטלגרם במקום ---
+            await fetch('/api/telegram', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title: 'TradeWall Alert 🚀', message })

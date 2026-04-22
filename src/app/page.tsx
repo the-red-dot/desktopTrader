@@ -19,7 +19,6 @@ type Prices = {
 };
 
 // --- Constants ---
-const SECRET_PIN = process.env.NEXT_PUBLIC_SECRET_PIN || "050488";
 const FINNHUB_API_KEY = process.env.NEXT_PUBLIC_FINNHUB_API_KEY || ""; 
 
 export default function TradeWall() {
@@ -444,7 +443,27 @@ export default function TradeWall() {
                     <h3 style={{ marginBottom: 20 }}>הפורטפוליו נעול</h3>
                     <input type="password" value={lockPin} onChange={e => setLockPin(e.target.value)}
                         className="glass-input lock-input" placeholder="****" maxLength={6} />
-                    <button onClick={() => { if (lockPin === SECRET_PIN) { updateLockState(false); setLockPin(''); } else alert('סיסמה שגויה!'); }}
+                    <button onClick={async () => {
+                        try {
+                            const res = await fetch('/api/verify-pin', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ pin: lockPin })
+                            });
+                            
+                            if (res.ok) {
+                                const data = await res.json();
+                                if (data.success) {
+                                    updateLockState(false); 
+                                    setLockPin('');
+                                }
+                            } else {
+                                alert('סיסמה שגויה!'); 
+                            }
+                        } catch (error) {
+                            alert('שגיאה בתקשורת עם השרת');
+                        }
+                    }}
                         className="btn-action btn-add-spot" style={{ width: 200, marginTop: 20 }}>פתיחה</button>
                 </div>
             );

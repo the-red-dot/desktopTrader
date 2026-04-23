@@ -9,6 +9,7 @@ import RiskCalculator from '../components/RiskCalculator';
 import KeyboardShortcuts from '../components/KeyboardShortcuts';
 import AuthModal from '../components/AuthModal';
 import PositionModal, { Position } from '../components/PositionModal'; 
+import { calculateHedgeStrategy } from './utils/hedgeLogic';
 
 type Portfolio = {
     [key: string]: Position[];
@@ -359,11 +360,15 @@ export default function TradeWall() {
         const { type, coin, index, shortIndex } = deleteModal;
         try {
             let idToDelete = '';
+            let parentSpot: Position | null = null;
+            let currentHedgeNum = 1;
             
             if (type === 'spot' && index !== null) {
                 idToDelete = portfolio[coin][index].id;
             } else if (type === 'short' && index !== null && shortIndex !== null) {
-                idToDelete = portfolio[coin][index].shorts[shortIndex].id;
+                parentSpot = portfolio[coin][index];
+                idToDelete = parentSpot.shorts[shortIndex].id;
+                currentHedgeNum = shortIndex + 1;
             }
 
             if (!idToDelete) return;
@@ -377,7 +382,6 @@ export default function TradeWall() {
                     .eq('user_id', user.id);
                 setRefreshTrigger(prev => prev + 1);
             } else {
-                const currentHedgeNum = (shortIndex ?? 0) + 1;
                 const nextHedgeNum = currentHedgeNum + 1;
 
                 const { data: alerts } = await supabase.from('alerts').select('id, note').eq('coin', coin).eq('user_id', user.id);
@@ -386,7 +390,8 @@ export default function TradeWall() {
                     const idsToDelete = alerts
                         .filter(a => {
                             if (!a.note) return false;
-                            const relatedToCurrent = a.note.includes(`Hedge ${currentHedgeNum}`);
+                            // זיהוי ומחיקת ההתראות הקשורות לגידור זה (כולל התראת ההשלמה) ולגידור הבא
+                            const relatedToCurrent = a.note.includes(`Hedge ${currentHedgeNum} `) || a.note.includes(`COMPLETE HEDGE ${currentHedgeNum}`);
                             const relatedToNextEntry = a.note.includes(`ENTER HEDGE ${nextHedgeNum}`);
                             return relatedToCurrent || relatedToNextEntry;
                         })
@@ -394,9 +399,52 @@ export default function TradeWall() {
                     
                     if (idsToDelete.length > 0) {
                         await supabase.from('alerts').delete().in('id', idsToDelete);
-                        setRefreshTrigger(prev => prev + 1);
                     }
                 }
+                
+                // --- שחזור התראת הכניסה לגידור שנמחק (בין אם היה חצי פוזיציה ובין אם מלא) ---
+                if (parentSpot && parentSpot.strategy_risk_percent && parentSpot.strategy_hedges_count) {
+                    let anchorPrice = parentSpot.entry;
+                    if (shortIndex !== null && shortIndex > 0 && parentSpot.shorts[shortIndex - 1]) {
+                        anchorPrice = parentSpot.shorts[shortIndex - 1].entry;
+                    }
+
+                    const setups = calculateHedgeStrategy(
+                        parentSpot.entry,
+                        parentSpot.tp,
+                        parentSpot.amount,
+                        parentSpot.strategy_risk_percent,
+                        parentSpot.strategy_hedges_count,
+                        anchorPrice
+                    );
+
+                    const setupToApply = setups.find(s => s.index === currentHedgeNum);
+                    
+                    if (setupToApply) {
+                        const alertCondition = setupToApply.entry < parentSpot.entry ? 'below' : 'above';
+                        const currentPrice = prices[coin];
+                        let shouldCreate = true;
+                        
+                        // מוודאים שהמחיר עוד לא עבר את היעד כדי לא לייצר התראות רפאים
+                        if (currentPrice) {
+                            if (alertCondition === 'above' && currentPrice >= setupToApply.entry) shouldCreate = false;
+                            if (alertCondition === 'below' && currentPrice <= setupToApply.entry) shouldCreate = false;
+                        }
+
+                        if (shouldCreate) {
+                            await supabase.from('alerts').insert([{
+                                coin: coin,
+                                alert_type: 'price',
+                                target_price: setupToApply.entry,
+                                condition: alertCondition,
+                                note: `⚠️ ENTER HEDGE ${setupToApply.index} @ $${setupToApply.entry} | Amt: ${setupToApply.coinAmount} | Inv: $${setupToApply.investAmount} | TP: ${setupToApply.tp} | SL: ${parentSpot.tp}`,
+                                user_id: user.id
+                            }]);
+                        }
+                    }
+                }
+
+                setRefreshTrigger(prev => prev + 1);
             }
 
             await fetchPortfolio(user ? user.id : null);
@@ -555,8 +603,15 @@ export default function TradeWall() {
                                 return (
                                     <div key={sIdx} className="sub-card">
                                         <div className="strategy-header" style={{ marginBottom: 8, border: 'none', padding: 0 }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                <span className="badge badge-short">Hedge {sIdx + 1} ({short.currency || 'USDT'})</span>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <span className="badge badge-short">Hedge {sIdx + 1} ({short.currency || 'USDT'})</span>
+                                                    {short.is_half_position && (
+                                                        <span style={{fontSize: '0.6rem', background: '#e17055', color: 'white', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold'}}>
+                                                            חצי פוזיציה
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 {short.trade_date && <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>{short.trade_date} {short.trade_time}</span>}
                                             </div>
                                             <div>

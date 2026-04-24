@@ -40,7 +40,13 @@ interface Alert {
 
 // קבועים
 const FINNHUB_API_KEY = process.env.NEXT_PUBLIC_FINNHUB_API_KEY || "";
-const TWELVEDATA_API_KEY = process.env.NEXT_PUBLIC_TWELVEDATA_API_KEY || "cd89afd64e59460d948bec4d847515a1"; // הוספת מפתח ה-API של Twelve Data
+
+// מערך מפתחות ה-API של Twelve Data (נשאב אך ורק מקובץ ה-ENV)
+const TWELVEDATA_KEYS = [
+    process.env.NEXT_PUBLIC_TWELVEDATA_API_KEY_1,
+    process.env.NEXT_PUBLIC_TWELVEDATA_API_KEY_2,
+    process.env.NEXT_PUBLIC_TWELVEDATA_API_KEY_3
+].filter(Boolean) as string[];
 
 const POPULAR_ASSETS = [
     { symbol: 'BTC', name: 'Bitcoin', type: 'crypto' },
@@ -205,7 +211,7 @@ export default function LiveTicker({ prices, onCoinClick, userId, refreshTrigger
     const [rsiLength, setRsiLength] = useState('14');
     const [rsiOverbought, setRsiOverbought] = useState('70');
     const [rsiOversold, setRsiOversold] = useState('30');
-    const [isPersistentRsi, setIsPersistentRsi] = useState(false); // דגל חדש להתראה קבועה
+    const [isPersistentRsi, setIsPersistentRsi] = useState(false);
 
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchType, setSearchType] = useState<'crypto' | 'stock'>('crypto');
@@ -214,8 +220,22 @@ export default function LiveTicker({ prices, onCoinClick, userId, refreshTrigger
 
     const [currentRsiValues, setCurrentRsiValues] = useState<Record<string, number>>({});
     
-    // זיכרון למניעת הפצצת התראות קבועות (מזהה התראה -> תאריך אחרון שבו הופעלה)
+    // טריגר ידני לבדיקת RSI מיידית לאחר הוספת התראה
+    const [rsiManualTrigger, setRsiManualTrigger] = useState(0);
+
+    // זיכרון למניעת הפצצת התראות קבועות ומעקב אחרי המפתח הנוכחי של Twelve Data
     const rsiAlertsCooldown = useRef<Record<string, number>>({});
+    const currentTdKeyIndex = useRef<number>(0); 
+    const initialCheckDone = useRef(false); 
+
+    // שמירת הסטייט ב-Refs כדי למנוע יצירת שעונים כפולים
+    const alertsRef = useRef(alerts);
+    const tickersRef = useRef(tickers);
+
+    useEffect(() => {
+        alertsRef.current = alerts;
+        tickersRef.current = tickers;
+    }, [alerts, tickers]);
 
     useEffect(() => {
         if (tickers && tickers.length > 0 && !newAlertCoin) {
@@ -250,98 +270,152 @@ export default function LiveTicker({ prices, onCoinClick, userId, refreshTrigger
         if (!error && data) setAlerts(data as Alert[]);
     };
 
-    // --- לוגיקת בדיקת התראות RSI מפוצלת: קריפטו (דקה) ומניות (12 דקות) ---
+    // --- לוגיקת בדיקת התראות RSI מפוצלת: קריפטו (דקה) ומניות (5 דקות תוך שימוש במפתחות מתחלפים) ---
     useEffect(() => {
-        const rsiAlerts = alerts.filter(a => a.alert_type === 'rsi');
-        if (rsiAlerts.length === 0) return;
-
         const checkRsiAlerts = async (targetType: 'crypto' | 'stock') => {
+            const currentAlerts = alertsRef.current.filter(a => a.alert_type === 'rsi');
+            if (currentAlerts.length === 0) return; // מותר לצאת רק מתוך הפונקציה הפנימית! לא מה-useEffect עצמו!
+
+            console.log(`%c[RSI Engine] 🚀 Running check for ${targetType.toUpperCase()} alerts...`, 'color: #8e44ad; font-size: 12px; font-weight: bold;');
+
             const triggeredAlertIds: string[] = [];
             const rsiUpdates: Record<string, number> = {};
             const now = Date.now();
 
-            const groupedRequests: Record<string, { type: 'crypto' | 'stock', symbol: string, tf: string, alerts: Alert[] }> = {};
+            const groupedRequests: Record<string, { type: 'crypto' | 'stock', tf: string, symbols: Set<string>, alerts: Alert[] }> = {};
             
-            rsiAlerts.forEach(alert => {
-                const ticker = tickers.find(t => t.symbol.toUpperCase() === alert.coin.toUpperCase());
+            currentAlerts.forEach(alert => {
+                const ticker = tickersRef.current.find(t => t.symbol.toUpperCase() === alert.coin.toUpperCase());
                 const type = (ticker ? ticker.type : (POPULAR_ASSETS.find(p => p.symbol.toUpperCase() === alert.coin.toUpperCase())?.type || 'crypto')) as 'crypto' | 'stock';
                 
-                // מסננים ובודקים בכל פעם רק את הסוג הרלוונטי (קריפטו או מניות)
                 if (type !== targetType) return;
                 
                 const symbol = type === 'crypto' ? `${alert.coin.toUpperCase()}USDT` : alert.coin.toUpperCase();
                 const tf = alert.timeframe || '1h';
-                const key = `${type}_${symbol}_${tf}`;
+                const key = `${type}_${tf}`;
                 
                 if (!groupedRequests[key]) {
-                    groupedRequests[key] = { type, symbol, tf, alerts: [] };
+                    groupedRequests[key] = { type, tf, symbols: new Set(), alerts: [] };
                 }
+                groupedRequests[key].symbols.add(symbol);
                 groupedRequests[key].alerts.push(alert);
             });
 
             const keys = Object.keys(groupedRequests);
-            if (keys.length === 0) return; // אין התראות פעילות מהסוג שנבדק כעת
+            if (keys.length === 0) return;
 
             for (const key of keys) {
-                const { type, symbol, tf, alerts: alertsGroup } = groupedRequests[key];
+                const { type, tf, symbols: symbolsSet, alerts: alertsGroup } = groupedRequests[key];
+                const symbolsArray = Array.from(symbolsSet);
                 
                 try {
-                    let closePrices: number[] = [];
-                    let currentAssetPrice = 0;
+                    let assetDataMap: Record<string, { currentPrice: number, closePrices: number[] }> = {};
                     
                     if (type === 'crypto') {
-                        // משיכת 150 נרות מ-Binance לקריפטו
-                        const limit = 150; 
-                        const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${tf}&limit=${limit}`);
-                        if (!response.ok) continue;
-                        
-                        const data = await response.json();
-                        closePrices = data.map((d: any[]) => parseFloat(d[4]));
+                        // Binance Crypto Fetch (Per Symbol)
+                        for (const symbol of symbolsArray) {
+                            const limit = 150; 
+                            const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${tf}&limit=${limit}`);
+                            if (!response.ok) continue;
+                            
+                            const data = await response.json();
+                            const closePrices = data.map((d: any[]) => parseFloat(d[4]));
+                            if (closePrices.length > 0) {
+                                assetDataMap[symbol] = {
+                                    currentPrice: closePrices[closePrices.length - 1],
+                                    closePrices
+                                };
+                            }
+                        }
                     } else {
-                        // Twelve Data API למניות בלבד
-                        if (!TWELVEDATA_API_KEY) {
-                            console.warn("Missing Twelve Data API Key");
+                        // Twelve Data API למניות עם Chunking (חלוקה לקבוצות קטנות)
+                        if (TWELVEDATA_KEYS.length === 0) {
+                            console.warn("%c[TwelveData] ERROR: No API Keys available in .env.local!", "color: red; font-weight: bold");
                             continue;
                         }
                         
-                        // התאמת חותמות הזמן של המערכת לאלו של Twelve Data
                         const tfMap: Record<string, string> = {
-                            '5m': '5min',
-                            '15m': '15min',
-                            '1h': '1h',
-                            '4h': '4h',
-                            '1d': '1day'
+                            '5m': '5min', '15m': '15min', '1h': '1h', '4h': '4h', '1d': '1day'
                         };
                         const res = tfMap[tf] || '1h';
+
+                        // מחלקים לקבוצות של עד 5 סמלים לבקשה אחת
+                        const CHUNK_SIZE = 5; 
                         
-                        const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=${res}&outputsize=150&apikey=${TWELVEDATA_API_KEY}`;
-                        const response = await fetch(url);
-                        
-                        if (!response.ok) {
-                            console.warn(`Twelve Data API error for ${symbol}: ${response.status}`);
-                            continue;
+                        for (let i = 0; i < symbolsArray.length; i += CHUNK_SIZE) {
+                            const chunk = symbolsArray.slice(i, i + CHUNK_SIZE);
+                            const symbolsString = chunk.join(',');
+                            
+                            let data = null;
+                            let attempts = 0;
+
+                            while (attempts < TWELVEDATA_KEYS.length) {
+                                const apiKey = TWELVEDATA_KEYS[currentTdKeyIndex.current];
+                                const url = `https://api.twelvedata.com/time_series?symbol=${symbolsString}&interval=${res}&outputsize=150&apikey=${apiKey}`;
+                                
+                                console.log(`%c[TwelveData] Fetching Chunk (${symbolsString}) [Interval: ${res}] with Key #${currentTdKeyIndex.current + 1}...`, 'color: #3498db; font-weight: bold;');
+                                
+                                const response = await fetch(url);
+                                
+                                if (response.ok) {
+                                    const resData = await response.json();
+                                    
+                                    if (resData.status === "error" && resData.code === 429) {
+                                        console.warn(`%c[TwelveData] ⚠️ LIMIT REACHED (429 JSON) on Key #${currentTdKeyIndex.current + 1}! Switching to next Key...`, 'color: #e74c3c; font-size: 13px; font-weight: bold;');
+                                        currentTdKeyIndex.current = (currentTdKeyIndex.current + 1) % TWELVEDATA_KEYS.length;
+                                        attempts++;
+                                        continue;
+                                    }
+                                    
+                                    if (resData.status === "error") {
+                                        console.warn(`[TwelveData] Error for ${symbolsString}:`, resData.message);
+                                        break; 
+                                    }
+                                    
+                                    data = resData;
+                                    console.log(`%c[TwelveData] ✅ SUCCESS fetched chunk with Key #${currentTdKeyIndex.current + 1}`, 'color: #2ecc71; font-weight: bold;');
+                                    break; 
+                                } else if (response.status === 429) {
+                                    console.warn(`%c[TwelveData] ⚠️ LIMIT REACHED (HTTP 429) on Key #${currentTdKeyIndex.current + 1}! Switching to next Key...`, 'color: #e74c3c; font-size: 13px; font-weight: bold;');
+                                    currentTdKeyIndex.current = (currentTdKeyIndex.current + 1) % TWELVEDATA_KEYS.length;
+                                    attempts++;
+                                    continue;
+                                } else {
+                                    console.warn(`[TwelveData] HTTP Error ${response.status} for ${symbolsString}`);
+                                    break; 
+                                }
+                            }
+
+                            if (!data) continue;
+                            
+                            // פיענוח מידע
+                            for (const symbol of chunk) {
+                                const stockDataObj = chunk.length > 1 ? data[symbol] : data;
+                                
+                                if (!stockDataObj || stockDataObj.status === "error" || !stockDataObj.values || stockDataObj.values.length === 0) {
+                                    continue;
+                                }
+                                
+                                const closePrices = stockDataObj.values.map((item: any) => parseFloat(item.close)).reverse();
+                                if (closePrices.length > 0) {
+                                    assetDataMap[symbol] = {
+                                        currentPrice: closePrices[closePrices.length - 1],
+                                        closePrices
+                                    };
+                                }
+                            }
                         }
-                        
-                        const data = await response.json();
-                        
-                        if (data.status === "error" || !data.values || data.values.length === 0) {
-                            console.warn(`Twelve Data no data for ${symbol}:`, data.message);
-                            continue;
-                        }
-                        
-                        // הנתונים מ-Twelve Data מגיעים מסודרים מהחדש לישן, יש להפוך אותם עבור ה-RSI
-                        closePrices = data.values.map((item: any) => parseFloat(item.close)).reverse();
                     }
 
-                    if (closePrices.length === 0) continue;
-                    currentAssetPrice = closePrices[closePrices.length - 1];
-                    
                     alertsGroup.forEach(alert => {
+                        const baseSymbol = type === 'crypto' ? `${alert.coin.toUpperCase()}USDT` : alert.coin.toUpperCase();
+                        const assetInfo = assetDataMap[baseSymbol];
+                        if (!assetInfo) return;
+                        
                         const length = alert.rsi_length || 14;
-                        const rsiValues = calculateRSI(closePrices, length);
+                        const rsiValues = calculateRSI(assetInfo.closePrices, length);
                         const currentRsi = rsiValues[rsiValues.length - 1];
 
-                        // מבטיח שה-RSI תקין ומוצג ולא "NaN" או ריק
                         if (currentRsi !== null && currentRsi !== undefined && !isNaN(currentRsi)) {
                             rsiUpdates[`${alert.id}`] = currentRsi;
 
@@ -356,11 +430,10 @@ export default function LiveTicker({ prices, onCoinClick, userId, refreshTrigger
                             if (triggeredCondition) {
                                 const isPersistent = alert.note?.includes('[PERSISTENT]');
                                 const lastTriggered = rsiAlertsCooldown.current[alert.id] || 0;
-                                const cooldownPeriod = 60 * 60 * 1000; // שעה של קירור
+                                const cooldownPeriod = 60 * 60 * 1000;
 
-                                // נתריע רק אם עברה שעה מאז הפעם האחרונה (או אם זו פעם ראשונה)
                                 if (now - lastTriggered > cooldownPeriod) {
-                                    sendRsiNotification(alert, currentRsi, currentAssetPrice, triggeredCondition);
+                                    sendRsiNotification(alert, currentRsi, assetInfo.currentPrice, triggeredCondition);
                                     rsiAlertsCooldown.current[alert.id] = now;
                                     
                                     if (!isPersistent) {
@@ -382,19 +455,34 @@ export default function LiveTicker({ prices, onCoinClick, userId, refreshTrigger
             if (triggeredAlertIds.length > 0) removeTriggeredAlerts(triggeredAlertIds);
         };
 
-        // הרצה ראשונית מיידית בעת עליית הקומפוננטה
-        checkRsiAlerts('crypto');
-        checkRsiAlerts('stock');
+        // בודק אם הופעל טריגר ידני (למשל כי נוספה עכשיו התראה חדשה)
+        if (rsiManualTrigger > 0) {
+            console.log(`%c[RSI Engine] ⚡ Manual trigger detected (New Alert Added). Checking immediately!`, 'color: #f39c12; font-size: 12px; font-weight: bold;');
+            checkRsiAlerts('crypto');
+            checkRsiAlerts('stock');
+        }
 
-        // הגדרת שעונים נפרדים
-        const cryptoIntervalId = setInterval(() => checkRsiAlerts('crypto'), 60 * 1000); // כל דקה לקריפטו
-        const stockIntervalId = setInterval(() => checkRsiAlerts('stock'), 12 * 60 * 1000); // כל 12 דקות למניות
+        // שעון האזנה ראשוני: מפעיל את הבדיקה ברגע שההתראות מגיעות מהרשת בפעם הראשונה
+        const initialPoll = setInterval(() => {
+            const hasRsiAlerts = alertsRef.current.filter(a => a.alert_type === 'rsi').length > 0;
+            if (hasRsiAlerts && !initialCheckDone.current) {
+                console.log("%c[RSI Engine] 🟢 Initial alerts loaded! Running first check...", 'color: #2ecc71; font-size: 12px; font-weight: bold;');
+                initialCheckDone.current = true;
+                checkRsiAlerts('crypto');
+                checkRsiAlerts('stock');
+                clearInterval(initialPoll);
+            }
+        }, 1000);
+
+        const cryptoIntervalId = setInterval(() => checkRsiAlerts('crypto'), 60 * 1000); 
+        const stockIntervalId = setInterval(() => checkRsiAlerts('stock'), 5 * 60 * 1000); 
 
         return () => {
+            clearInterval(initialPoll);
             clearInterval(cryptoIntervalId);
             clearInterval(stockIntervalId);
         };
-    }, [alerts, tickers]);
+    }, [rsiManualTrigger]); // התלות היחידה של השעונים היא הטריגר הידני
 
     // בדיקת התראות מחיר
     useEffect(() => {
@@ -563,6 +651,11 @@ export default function LiveTicker({ prices, onCoinClick, userId, refreshTrigger
             if (alertType === 'price') setNewAlertPrice('');
             setNewAlertNote('');
             setIsPersistentRsi(false); // איפוס הטוגל
+            
+            // טריגר שמעדכן את ה-RSI באופן מיידי!
+            if (alertType === 'rsi') {
+                setRsiManualTrigger(prev => prev + 1);
+            }
         }
     };
 
@@ -672,7 +765,6 @@ export default function LiveTicker({ prices, onCoinClick, userId, refreshTrigger
                                     <div style={{ display: 'flex', gap: '10px' }}>
                                         <div style={{ flex: 1 }}>
                                             <label style={{ fontSize: '0.75rem', opacity: 0.8, marginBottom: '4px', display: 'block' }}>מטבע/מניה</label>
-                                            {/* נשתמש ב-tickers כאן כדי שאפשר יהיה לבחור מכל הנכסים השמורים */}
                                             <CustomDropdown value={newAlertCoin} options={tickers.map(c => ({ value: c.symbol, label: c.symbol }))} onChange={setNewAlertCoin} />
                                         </div>
                                         <div style={{ flex: 1 }}>
@@ -740,7 +832,7 @@ export default function LiveTicker({ prices, onCoinClick, userId, refreshTrigger
                                     </div>
                                     
                                     <div style={{fontSize:'0.7rem', opacity: 0.5, textAlign: 'center', marginTop: '6px'}}>
-                                        *ה-RSI נבדק כל דקה לקריפטו, וכל 12 דק' למניות
+                                        *ה-RSI נבדק כל דקה לקריפטו, וכל 5 דק' למניות
                                     </div>
                                 </div>
                             )}

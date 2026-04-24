@@ -250,12 +250,12 @@ export default function LiveTicker({ prices, onCoinClick, userId, refreshTrigger
         if (!error && data) setAlerts(data as Alert[]);
     };
 
-    // --- לוגיקת בדיקת התראות RSI מול Binance API ו-Twelve Data API למניות ---
+    // --- לוגיקת בדיקת התראות RSI מפוצלת: קריפטו (דקה) ומניות (12 דקות) ---
     useEffect(() => {
         const rsiAlerts = alerts.filter(a => a.alert_type === 'rsi');
         if (rsiAlerts.length === 0) return;
 
-        const checkRsiAlerts = async () => {
+        const checkRsiAlerts = async (targetType: 'crypto' | 'stock') => {
             const triggeredAlertIds: string[] = [];
             const rsiUpdates: Record<string, number> = {};
             const now = Date.now();
@@ -263,9 +263,11 @@ export default function LiveTicker({ prices, onCoinClick, userId, refreshTrigger
             const groupedRequests: Record<string, { type: 'crypto' | 'stock', symbol: string, tf: string, alerts: Alert[] }> = {};
             
             rsiAlerts.forEach(alert => {
-                // זיהוי חכם: נחפש גם ב-tickers וגם ב-POPULAR_ASSETS כגיבוי, עם טיפוס מפורש
                 const ticker = tickers.find(t => t.symbol.toUpperCase() === alert.coin.toUpperCase());
                 const type = (ticker ? ticker.type : (POPULAR_ASSETS.find(p => p.symbol.toUpperCase() === alert.coin.toUpperCase())?.type || 'crypto')) as 'crypto' | 'stock';
+                
+                // מסננים ובודקים בכל פעם רק את הסוג הרלוונטי (קריפטו או מניות)
+                if (type !== targetType) return;
                 
                 const symbol = type === 'crypto' ? `${alert.coin.toUpperCase()}USDT` : alert.coin.toUpperCase();
                 const tf = alert.timeframe || '1h';
@@ -277,7 +279,10 @@ export default function LiveTicker({ prices, onCoinClick, userId, refreshTrigger
                 groupedRequests[key].alerts.push(alert);
             });
 
-            for (const key of Object.keys(groupedRequests)) {
+            const keys = Object.keys(groupedRequests);
+            if (keys.length === 0) return; // אין התראות פעילות מהסוג שנבדק כעת
+
+            for (const key of keys) {
                 const { type, symbol, tf, alerts: alertsGroup } = groupedRequests[key];
                 
                 try {
@@ -371,14 +376,24 @@ export default function LiveTicker({ prices, onCoinClick, userId, refreshTrigger
                 }
             }
 
-            setCurrentRsiValues(prev => ({...prev, ...rsiUpdates}));
+            if (Object.keys(rsiUpdates).length > 0) {
+                setCurrentRsiValues(prev => ({...prev, ...rsiUpdates}));
+            }
             if (triggeredAlertIds.length > 0) removeTriggeredAlerts(triggeredAlertIds);
         };
 
-        checkRsiAlerts();
-        const intervalId = setInterval(checkRsiAlerts, 60000); 
+        // הרצה ראשונית מיידית בעת עליית הקומפוננטה
+        checkRsiAlerts('crypto');
+        checkRsiAlerts('stock');
 
-        return () => clearInterval(intervalId);
+        // הגדרת שעונים נפרדים
+        const cryptoIntervalId = setInterval(() => checkRsiAlerts('crypto'), 60 * 1000); // כל דקה לקריפטו
+        const stockIntervalId = setInterval(() => checkRsiAlerts('stock'), 12 * 60 * 1000); // כל 12 דקות למניות
+
+        return () => {
+            clearInterval(cryptoIntervalId);
+            clearInterval(stockIntervalId);
+        };
     }, [alerts, tickers]);
 
     // בדיקת התראות מחיר
@@ -724,8 +739,8 @@ export default function LiveTicker({ prices, onCoinClick, userId, refreshTrigger
                                         </div>
                                     </div>
                                     
-                                    <div style={{fontSize:'0.7rem', opacity: 0.5, textAlign: 'center', marginTop: '-4px'}}>
-                                        *ה-RSI נבדק כל דקה (לא מעמיס על האתר)
+                                    <div style={{fontSize:'0.7rem', opacity: 0.5, textAlign: 'center', marginTop: '6px'}}>
+                                        *ה-RSI נבדק כל דקה לקריפטו, וכל 12 דק' למניות
                                     </div>
                                 </div>
                             )}

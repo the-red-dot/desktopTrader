@@ -1,4 +1,4 @@
-// tradewall\src\app\page.tsx
+// src/app/page.tsx
 
 'use client';
 
@@ -8,7 +8,8 @@ import LiveTicker, { TickerItem } from '../components/LiveTicker';
 import RiskCalculator from '../components/RiskCalculator';
 import KeyboardShortcuts from '../components/KeyboardShortcuts';
 import AuthModal from '../components/AuthModal';
-import PositionModal, { Position } from '../components/PositionModal'; 
+import PositionModal, { Position } from '../components/PositionModal';
+import SavingsHub from '../components/SavingsHub';
 import { calculateHedgeStrategy } from './utils/hedgeLogic';
 
 type Portfolio = {
@@ -699,6 +700,7 @@ export default function TradeWall() {
                     <div className="tabs-container">
                         <button className={`tab-btn ${activeTab === 'calc' ? 'active' : ''}`} onClick={() => setActiveTab('calc')}>מחשבון</button>
                         <button className={`tab-btn ${activeTab === 'shortcuts' ? 'active' : ''}`} onClick={() => setActiveTab('shortcuts')}>קיצורים</button>
+                        <button className={`tab-btn ${activeTab === 'savings' ? 'active' : ''}`} onClick={() => setActiveTab('savings')}>חסכונות וקרנות</button>
                         
                         {/* כפתור קריפטו - מציג את כל מטבעות הקריפטו */}
                         <button className={`tab-btn ${activeTab === 'crypto_hub' || tickers.find(t => t.symbol === activeTab && t.type === 'crypto') ? 'active' : ''}`} 
@@ -715,6 +717,7 @@ export default function TradeWall() {
 
                     {activeTab === 'calc' && <RiskCalculator prices={prices} />}
                     {activeTab === 'shortcuts' && <KeyboardShortcuts />}
+                    {activeTab === 'savings' && <SavingsHub user={user} />}
                     
                     {activeTab === 'crypto_hub' && renderCategoryHub('crypto')}
                     {activeTab === 'stock_hub' && renderCategoryHub('stock')}
